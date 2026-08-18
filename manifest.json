@@ -1,0 +1,15 @@
+{
+  "name": "速算小达人 · 三年级速算练习",
+  "short_name": "速算小达人",
+  "description": "帮助小学三年级学生练习速算：加减法、乘法、除数是一位数的除法。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#aee3f7",
+  "theme_color": "#ff9f43",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

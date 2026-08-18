@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>速算小达人 · 三年级速算练习</title>
+  <meta name="description" content="帮助小学三年级学生练习速算的小游戏：加减法、乘法、除数是一位数的除法，练习与挑战双模式。">
+  <link rel="stylesheet" href="style.css">
+  <!-- PWA：添加到主屏幕 / 离线可玩 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ff9f43">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="速算小达人">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="logo">🚀 速算小达人</div>
+    <div class="controls">
+      <div class="seg" id="difficultySeg">
+        <button class="seg-btn active" data-diff="basic">基础</button>
+        <button class="seg-btn" data-diff="advanced">进阶</button>
+      </div>
+      <button id="soundBtn" class="icon-btn" title="音效开关">🔊</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ========== 首页 ========== -->
+    <section id="screen-home" class="screen active">
+      <h2>选择一种玩法，开始练习吧！</h2>
+      <div class="mode-cards">
+        <button class="mode-card" data-mode="practice">
+          <span class="mode-emoji">📝</span>
+          <span class="mode-name">练习模式</span>
+          <span class="mode-desc">不限时间，自选题型，慢慢练</span>
+        </button>
+        <button class="mode-card" data-mode="challenge">
+          <span class="mode-emoji">⏱️</span>
+          <span class="mode-name">挑战模式</span>
+          <span class="mode-desc">限时 60 秒，连对加分冲高分</span>
+        </button>
+      </div>
+      <div class="best-score" id="homeBest"></div>
+    </section>
+
+    <!-- ========== 练习设置 ========== -->
+    <section id="screen-setup" class="screen">
+      <h2>选择要练习的题型</h2>
+      <div class="type-grid" id="typeGrid">
+        <label class="type-chip"><input type="checkbox" value="add" checked>➕ 加法</label>
+        <label class="type-chip"><input type="checkbox" value="sub" checked>➖ 减法</label>
+        <label class="type-chip"><input type="checkbox" value="mul" checked>✖️ 乘法</label>
+        <label class="type-chip"><input type="checkbox" value="div" checked>➗ 除法</label>
+      </div>
+      <p class="hint" id="setupHint"></p>
+      <div class="btn-row">
+        <button id="startPracticeBtn" class="btn primary">开始练习</button>
+        <button class="btn ghost" data-back>返回</button>
+      </div>
+    </section>
+
+    <!-- ========== 游戏 ========== -->
+    <section id="screen-game" class="screen">
+      <div class="game-bar">
+        <span id="gameModeLabel"></span>
+        <span id="gameStats"></span>
+        <button class="icon-btn" id="quitBtn" title="结束本轮">✖</button>
+      </div>
+
+      <div class="timer-row" id="timerRow" hidden>
+        <span id="timerText"></span>
+        <div class="timer-track"><div class="timer-bar" id="timerBar"></div></div>
+      </div>
+
+      <div class="question-card" id="questionCard">
+        <div class="question-text" id="questionText"></div>
+        <div class="answer-row">
+          <span class="eq">=</span>
+          <input class="answer-box" id="box1" readonly autocomplete="off" tabindex="0">
+          <span class="remainder-slot" id="remSlot" hidden>余 <input class="answer-box" id="box2" readonly autocomplete="off" tabindex="0"></span>
+        </div>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+
+      <button class="key rem-key" id="remKey" hidden>填写余数 →</button>
+
+      <div class="keypad" id="keypad">
+        <button class="key" data-key="1">1</button>
+        <button class="key" data-key="2">2</button>
+        <button class="key" data-key="3">3</button>
+        <button class="key" data-key="4">4</button>
+        <button class="key" data-key="5">5</button>
+        <button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button>
+        <button class="key" data-key="8">8</button>
+        <button class="key" data-key="9">9</button>
+        <button class="key fn" data-key="back">⌫</button>
+        <button class="key" data-key="0">0</button>
+        <button class="key fn ok" data-key="ok">✓</button>
+      </div>
+
+      <p class="foot-note">提示：也可以直接用键盘输入，回车确定</p>
+    </section>
+
+    <!-- ========== 结果 ========== -->
+    <section id="screen-result" class="screen">
+      <h2 id="resultTitle"></h2>
+      <div class="result-card">
+        <div id="resultStats"></div>
+      </div>
+      <div class="best-box" id="bestBox" hidden></div>
+      <div class="btn-row">
+        <button id="againBtn" class="btn primary">再来一轮</button>
+        <button class="btn ghost" data-back>回首页</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
