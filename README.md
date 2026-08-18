@@ -2,6 +2,10 @@
 
 帮助小学三年级学生练习速算的小游戏，纯静态实现，零依赖，双击即玩。
 
+## 在线体验
+
+已通过 GitHub Pages 部署：<https://xwang9401.github.io/math-game/>
+
 ## 运行方式
 
 ```powershell
