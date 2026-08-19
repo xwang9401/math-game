@@ -1,11 +1,10 @@
 /* ============================================================
  * Service Worker —— 让游戏可以「添加到主屏幕」并离线游玩
- * 注意：修改游戏文件后，请把下面的 CACHE 版本号 +1，
- * 浏览器才会拉取新版本（例如 sxd-v1 → sxd-v2）。
+ * 修改预缓存资源后请递增 CACHE 版本号。
  * ============================================================ */
 'use strict';
 
-const CACHE = 'sxd-v4';
+const CACHE = 'sxd-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -17,43 +16,57 @@ const ASSETS = [
   './icons/icon-512.png',
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(ASSETS);
+    await self.skipWaiting();
+  })());
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
-function cachePut(req, res) {
-  caches.open(CACHE).then((c) => c.put(req, res)).catch(() => {});
+async function cacheSuccessfulSameOrigin(request, response) {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || !response.ok || response.type !== 'basic') return;
+  try {
+    const cache = await caches.open(CACHE);
+    await cache.put(request, response);
+  } catch (error) {
+    // 缓存写入失败不应让已经成功的网络响应失败。
+  }
 }
 
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
 
-  // 页面导航优先走网络（保证更新即时生效），失败时回退缓存
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then((res) => { cachePut(req, res.clone()); return res; })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
-    );
+  // 页面导航优先走网络，失败时回退到当前请求缓存或应用入口。
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        await cacheSuccessfulSameOrigin(request, response.clone());
+        return response;
+      } catch (error) {
+        return (await caches.match(request)) || (await caches.match('./index.html')) || Response.error();
+      }
+    })());
     return;
   }
 
-  // 静态资源：缓存优先
-  e.respondWith(
-    caches.match(req).then(
-      (hit) => hit || fetch(req).then((res) => { cachePut(req, res.clone()); return res; })
-    )
-  );
+  // 静态资源缓存优先；只缓存同源成功响应，避免把 404/500 固化到缓存。
+  event.respondWith((async () => {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    const response = await fetch(request);
+    await cacheSuccessfulSameOrigin(request, response.clone());
+    return response;
+  })());
 });

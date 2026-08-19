@@ -25,7 +25,7 @@
         <button class="seg-btn active" data-diff="basic">基础</button>
         <button class="seg-btn" data-diff="advanced">进阶</button>
       </div>
-      <button id="soundBtn" class="icon-btn" title="音效开关">🔊</button>
+      <button id="soundBtn" class="icon-btn" type="button" title="音效开关" aria-label="关闭音效" aria-pressed="true">🔊</button>
     </div>
   </header>
 
@@ -88,7 +88,7 @@
       <div class="game-bar">
         <span id="gameModeLabel"></span>
         <span id="gameStats"></span>
-        <button class="icon-btn" id="quitBtn" title="结束本轮">✖</button>
+        <button class="icon-btn" id="quitBtn" type="button" title="结束本轮" aria-label="结束本轮">✖</button>
       </div>
 
       <div class="timer-row" id="timerRow" hidden>
@@ -110,12 +110,12 @@
         <div class="question-text" id="questionText"></div>
         <div class="answer-row">
           <span class="eq">=</span>
-          <input class="answer-box" id="box1" readonly autocomplete="off" tabindex="0">
-          <span class="remainder-slot" id="remSlot" hidden>余 <input class="answer-box" id="box2" readonly autocomplete="off" tabindex="0"></span>
+          <input class="answer-box" id="box1" readonly inputmode="numeric" autocomplete="off" tabindex="0" aria-label="答案">
+          <span class="remainder-slot" id="remSlot" hidden>余 <input class="answer-box" id="box2" readonly inputmode="numeric" autocomplete="off" tabindex="0" aria-label="余数"></span>
         </div>
       </div>
 
-      <div class="feedback" id="feedback"></div>
+      <div class="feedback" id="feedback" role="status" aria-live="polite" aria-atomic="true"></div>
 
       <button class="key rem-key" id="remKey" hidden>填写余数 →</button>
 

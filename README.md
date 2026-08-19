@@ -78,15 +78,29 @@ start .\index.html
 | `basePoints` | 挑战模式答对基础分 |
 | `streakBonusStep` | 连击每 +1 额外加分 |
 | `correctDelay` / `wrongDelay` | 答对/答错后停留时间（毫秒） |
-| `chase.lag` | 闯关追逐：怪兽初始落后距离（0.18） |
-| `chase.wrongStep` | 每答错一题怪兽额外前进（0.06） |
+| `chase.lag` | 闯关追逐：怪兽初始落后距离（0.30） |
+| `chase.wrongStep` | 每答错一题怪兽额外前进（0.045） |
 | `chase.secPerQ` / `bossSecPerQ` | 怪兽速度按每题期望耗时（秒）标定，越小怪兽越快 |
 
 ## 文件结构
 
 ```
 math-game/
-├── index.html   # 页面结构
-├── style.css    # 样式（儿童友好：大按钮、鲜艳配色）
-└── game.js      # 游戏逻辑（出题、计分、音效、存档）
+├── index.html                  # 页面结构与无障碍语义
+├── style.css                   # 样式（儿童友好、响应式、减少动态效果）
+├── game.js                     # 游戏逻辑（出题、计分、音效、存档）
+├── manifest.json               # PWA 元数据
+├── sw.js                       # 离线缓存
+├── icons/                      # 主屏幕图标
+└── tests/review-fixes.test.mjs # 零依赖回归检查
 ```
+
+## 回归检查
+
+项目不需要安装依赖。修改代码后运行：
+
+```bash
+node tests/review-fixes.test.mjs
+```
+
+检查覆盖 JavaScript 语法、四类出题器的数值约束、闯关题量边界、异步取消保护、挑战截止时间保护、无障碍标记以及 Service Worker 缓存规则。
