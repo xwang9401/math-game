@@ -545,6 +545,253 @@ h2 {
   margin-top: 4px;
 }
 
+/* ---------- 首页：闯关大卡片 ---------- */
+.mode-card.adventure {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  background: linear-gradient(120deg, #e0f2ff 0%, #d9c8ff 55%, #ffe3f3 100%);
+  border: 3px solid #b9a8f5;
+}
+.mode-card.adventure .mode-emoji { font-size: 44px; }
+.mode-card.adventure .mode-name { color: #6a4fc4; }
+.mode-card.adventure .mode-desc { text-align: left; }
+.adv-card-text { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.adv-progress {
+  font-size: 13px;
+  font-weight: 800;
+  color: #8a6de0;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  padding: 4px 12px;
+  align-self: flex-start;
+}
+
+/* ---------- 关卡地图 ---------- */
+.map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 6px 0 14px;
+}
+.btn.small { padding: 8px 16px; font-size: 14px; border-radius: 12px; }
+.map-crystal {
+  font-weight: 800;
+  font-size: 17px;
+  color: #6a4fc4;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 16px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.finale-banner {
+  text-align: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: #fff;
+  background: linear-gradient(90deg, #9b6ef3, #f36fb1);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 14px;
+  animation: pop 0.5s ease, glowPulse 1.6s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  50% { box-shadow: 0 0 22px rgba(155, 110, 243, 0.65); }
+}
+.map-world {
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.map-world.w-garden { border-top: 6px solid #7ed67e; }
+.map-world.w-snow   { border-top: 6px solid #7ec8f5; }
+.map-world.w-castle { border-top: 6px solid #b9a0f5; }
+.map-world-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 17px;
+  color: #43506a;
+  margin-bottom: 10px;
+}
+.map-world-title .w-sub { font-size: 12px; font-weight: 600; color: #8a97a5; }
+.map-levels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.map-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #fff;
+  border: 3px solid #e3eaf2;
+  border-radius: 16px;
+  padding: 10px 4px 8px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  position: relative;
+}
+.map-node:active { transform: scale(0.96); }
+.map-node .node-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 19px;
+  background: #eef3fa;
+  color: #43506a;
+}
+.map-node.boss .node-num { background: linear-gradient(135deg, #ff9f43, #ff6b6b); color: #fff; font-size: 15px; }
+.map-node .node-name { font-size: 11px; color: #8a97a5; font-weight: 700; text-align: center; line-height: 1.3; }
+.map-node .node-stars { font-size: 13px; letter-spacing: 1px; color: #f5b301; height: 16px; }
+.map-node .node-stars .off { color: #d5dbe3; }
+.map-node.locked { opacity: 0.55; cursor: not-allowed; }
+.map-node.locked .node-num { background: #dde3ea; }
+.map-node.current { border-color: #f5a623; animation: nodePulse 1.4s ease-in-out infinite; }
+@keyframes nodePulse {
+  50% { box-shadow: 0 0 0 7px rgba(245, 166, 35, 0.22); }
+}
+.map-node .node-princess {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  pointer-events: none;
+  animation: bob 1.2s ease-in-out infinite;
+}
+@keyframes bob {
+  50% { transform: translateX(-50%) translateY(-4px); }
+}
+
+/* ---------- 追逐跑道 ---------- */
+.chase-scene { margin-bottom: 12px; }
+.chase-track {
+  position: relative;
+  height: 84px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.14), 0 3px 10px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(180deg, #cfeebb 0%, #9fd88a 60%, #7bc463 100%);
+}
+.chase-track.w-snow   { background: linear-gradient(180deg, #dff2ff 0%, #bfe3f9 60%, #9cd0f0 100%); }
+.chase-track.w-castle { background: linear-gradient(180deg, #3d3160 0%, #584a8c 60%, #7a68b5 100%); }
+.chase-track::after {  /* 地面线 */
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 14px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.5);
+}
+.chase-runner {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  width: 44px;
+  height: 54px;
+  transition: transform 0.55s ease;
+  will-change: transform;
+}
+.chase-princess { z-index: 2; }
+.chase-monster { z-index: 1; }
+.chase-goal {
+  position: absolute;
+  right: 6px;
+  bottom: 10px;
+  width: 52px;
+  z-index: 3;
+  animation: goalGlow 2s ease-in-out infinite;
+}
+@keyframes goalGlow {
+  50% { filter: drop-shadow(0 0 8px rgba(120, 220, 255, 0.95)); }
+}
+.chase-track.danger { animation: dangerFlash 0.8s ease-in-out infinite; }
+@keyframes dangerFlash {
+  50% { box-shadow: inset 0 0 26px rgba(255, 60, 60, 0.55), 0 3px 10px rgba(0, 0, 0, 0.1); }
+}
+.chase-tip {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7a8b9a;
+  margin-top: 4px;
+  min-height: 16px;
+}
+
+/* SVG 角色内部动画：跑步腿摆、怪兽浮动 */
+.chase-runner .leg { transform-origin: 50% 0; animation: legSwing 0.32s ease-in-out infinite alternate; }
+.chase-runner .leg.back { animation-delay: 0.16s; }
+.chase-runner .arm { transform-origin: 50% 0; animation: legSwing 0.32s ease-in-out infinite alternate-reverse; }
+@keyframes legSwing { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
+.chase-runner.paused .leg, .chase-runner.paused .arm { animation-play-state: paused; }
+.chase-monster svg { animation: monsterBob 0.7s ease-in-out infinite; }
+@keyframes monsterBob { 50% { transform: translateY(-3px) rotate(-2deg); } }
+.chase-track.danger + .chase-tip::before { content: '⚠️ '; }
+.chase-princess.win svg { animation: princessJump 0.5s ease-in-out 2; }
+@keyframes princessJump { 50% { transform: translateY(-12px); } }
+body.dim::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 40, 0.55);
+  pointer-events: none;
+  animation: dimIn 0.4s ease;
+  z-index: 60;
+}
+@keyframes dimIn { from { opacity: 0; } }
+
+/* ---------- 全屏特效层 ---------- */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 50;
+}
+.particle {
+  position: absolute;
+  will-change: transform, opacity;
+  animation: fxFly var(--t, 0.8s) cubic-bezier(0.15, 0.6, 0.4, 1) forwards;
+}
+@keyframes fxFly {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.5); opacity: 0; }
+}
+
+/* ---------- 结算星星 ---------- */
+.stars-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+.big-star {
+  font-size: 52px;
+  color: #f5b301;
+  text-shadow: 0 0 18px rgba(245, 179, 1, 0.75);
+  opacity: 0;
+  transform: scale(0);
+}
+.big-star.on { animation: starPop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) forwards; }
+.big-star:nth-child(2).on { animation-delay: 0.22s; }
+.big-star:nth-child(3).on { animation-delay: 0.44s; }
+.big-star.off-star { color: #d5dbe3; text-shadow: none; }
+@keyframes starPop {
+  0% { opacity: 0; transform: scale(0) rotate(-40deg); }
+  70% { opacity: 1; transform: scale(1.25) rotate(8deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
 /* ---------- 小屏适配 ---------- */
 @media (max-width: 380px) {
   .question-text { font-size: 36px; letter-spacing: 2px; }
@@ -552,4 +799,12 @@ h2 {
   .remainder-slot .answer-box { width: 76px; }
   .key { height: 56px; font-size: 23px; }
   .mode-card { padding: 20px 10px; }
+  .mode-card.adventure { padding: 14px 12px; gap: 10px; }
+  .mode-card.adventure .mode-emoji { font-size: 36px; }
+  .chase-track { height: 70px; }
+  .chase-runner { width: 36px; height: 44px; }
+  .chase-goal { width: 42px; }
+  .map-levels { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .map-node .node-name { font-size: 10px; }
+  .big-star { font-size: 42px; }
 }

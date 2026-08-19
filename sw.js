@@ -5,7 +5,7 @@
  * ============================================================ */
 'use strict';
 
-const CACHE = 'sxd-v2';
+const CACHE = 'sxd-v3';
 const ASSETS = [
   './',
   './index.html',

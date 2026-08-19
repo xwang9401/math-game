@@ -35,6 +35,14 @@
     <section id="screen-home" class="screen active">
       <h2>选择一种玩法，开始练习吧！</h2>
       <div class="mode-cards">
+        <button class="mode-card adventure" data-mode="adventure">
+          <span class="mode-emoji" id="advCardEmoji">👸</span>
+          <span class="adv-card-text">
+            <span class="mode-name">闯关冒险 · 雪儿公主的魔法之旅</span>
+            <span class="mode-desc">答对帮公主甩开怪兽，收集魔法水晶！</span>
+            <span class="adv-progress" id="homeAdv"></span>
+          </span>
+        </button>
         <button class="mode-card" data-mode="practice">
           <span class="mode-emoji">📝</span>
           <span class="mode-name">练习模式</span>
@@ -47,6 +55,16 @@
         </button>
       </div>
       <div class="best-score" id="homeBest"></div>
+    </section>
+
+    <!-- ========== 关卡地图 ========== -->
+    <section id="screen-map" class="screen">
+      <div class="map-head">
+        <button class="btn ghost small" data-back>← 返回</button>
+        <div class="map-crystal" id="mapCrystal">💎 0 / 12</div>
+      </div>
+      <div id="finaleBanner" class="finale-banner" hidden>👑 水晶集齐！点最终关开启大结局 👑</div>
+      <div class="map-worlds" id="mapWorlds"></div>
     </section>
 
     <!-- ========== 练习设置 ========== -->
@@ -76,6 +94,16 @@
       <div class="timer-row" id="timerRow" hidden>
         <span id="timerText"></span>
         <div class="timer-track"><div class="timer-bar" id="timerBar"></div></div>
+      </div>
+
+      <!-- 闯关追逐场景：怪兽在追，公主要赶到终点 -->
+      <div class="chase-scene" id="chaseScene" hidden>
+        <div class="chase-track" id="chaseTrack">
+          <div class="chase-goal" id="chaseGoal"></div>
+          <div class="chase-runner chase-monster" id="chaseMonster"></div>
+          <div class="chase-runner chase-princess" id="chasePrincess"></div>
+        </div>
+        <div class="chase-tip" id="chaseTip"></div>
       </div>
 
       <div class="question-card" id="questionCard">
@@ -112,17 +140,30 @@
     <!-- ========== 结果 ========== -->
     <section id="screen-result" class="screen">
       <h2 id="resultTitle"></h2>
+      <div class="stars-row" id="starsRow" hidden>
+        <span class="big-star" id="star1">★</span>
+        <span class="big-star" id="star2">★</span>
+        <span class="big-star" id="star3">★</span>
+      </div>
       <div class="result-card">
         <div id="resultStats"></div>
       </div>
       <div class="best-box" id="bestBox" hidden></div>
-      <div class="btn-row">
+      <div class="btn-row" id="normalBtns">
         <button id="againBtn" class="btn primary">再来一轮</button>
         <button class="btn ghost" data-back>回首页</button>
+      </div>
+      <div class="btn-row" id="advBtns" hidden>
+        <button id="nextLevelBtn" class="btn primary">下一关 →</button>
+        <button id="retryBtn" class="btn primary">再试一次</button>
+        <button id="mapBtn" class="btn ghost">回地图</button>
       </div>
     </section>
 
   </main>
+
+  <!-- 全屏特效层（彩带 / 雪花 / 冰晶绽放） -->
+  <div class="fx-layer" id="fxLayer"></div>
 
   <script src="game.js"></script>
 </body>
