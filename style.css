@@ -816,3 +816,13 @@ body.dim::after {
   .map-node .node-name { font-size: 10px; }
   .big-star { font-size: 42px; }
 }
+
+/* ---------- 减少动态效果 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

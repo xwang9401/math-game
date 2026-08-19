@@ -38,6 +38,14 @@
   const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+  function storageGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+  }
+
   const TYPE_NAMES = { add: '加法', sub: '减法', mul: '乘法', div: '除法' };
   const DIFF_NAMES = { basic: '基础', advanced: '进阶' };
   const DIFF_DESC = {
@@ -158,20 +166,48 @@
       ],
     },
   ];
-  const TOTAL_LEVELS = 12;
+  const LEVELS = WORLDS.flatMap((world, wid) =>
+    world.levels.map((level, lid) => ({ wid, lid, level }))
+  );
+  const TOTAL_LEVELS = LEVELS.length;
+
+  function levelId(wid, lid) {
+    return LEVELS.findIndex((item) => item.wid === wid && item.lid === lid);
+  }
+
+  function levelAt(id) {
+    return LEVELS[id] || null;
+  }
 
   /* ---------------- 冒险存档 ---------------- */
+  function normalizeAdvStars(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const candidate = {};
+    Object.keys(value).forEach((key) => {
+      const id = Number(key);
+      const stars = Number(value[key]);
+      if (Number.isInteger(id) && id >= 0 && id < TOTAL_LEVELS
+        && Number.isInteger(stars) && stars >= 1 && stars <= 3) {
+        candidate[id] = stars;
+      }
+    });
+
+    // 进度必须从第 0 关开始连续，损坏或被篡改的跳关数据不予采用。
+    const clean = {};
+    for (let id = 0; id < TOTAL_LEVELS && candidate[id]; id++) clean[id] = candidate[id];
+    return clean;
+  }
+
   function loadAdvStars() {
-    const v = loadBest('sxd_adventure');
-    return v && typeof v === 'object' ? v : {};
+    return normalizeAdvStars(loadBest('sxd_adventure'));
   }
   function saveAdvStars(map) {
-    saveBest('sxd_adventure', map);
+    saveBest('sxd_adventure', normalizeAdvStars(map));
   }
   function advUnlockedTo(stars) {
-    let max = -1;
-    for (const k in stars) max = Math.max(max, parseInt(k, 10) || 0);
-    return max + 1;   // 下一关索引；0 表示第 0 关可玩
+    let id = 0;
+    while (id < TOTAL_LEVELS && stars[id]) id += 1;
+    return id;   // 下一关索引；0 表示第 0 关可玩
   }
 
   /* ---------------- 游戏状态 ---------------- */
@@ -191,7 +227,8 @@
     score: 0, streak: 0, maxStreak: 0,
     cCorrect: 0, cWrong: 0,  // 挑战统计
     adv: null,               // 闯关状态 { wid, lid, qIndex, correct, wrong, princess, monster, speed, timer, ending }
-    soundOn: localStorage.getItem('sxd_sound') !== '0',
+    adventureRunSeq: 0,
+    soundOn: storageGet('sxd_sound') !== '0',
   };
 
   /* ============================================================
@@ -305,9 +342,28 @@
 
   function showScreen(name) {
     state.screen = name;
-    $$('.screen').forEach((s) => s.classList.toggle('active', s.id === 'screen-' + name));
+    $$('.screen').forEach((s) => {
+      const active = s.id === 'screen-' + name;
+      s.classList.toggle('active', active);
+      s.setAttribute('aria-hidden', String(!active));
+    });
     // 游戏中锁定难度切换
     $$('#difficultySeg .seg-btn').forEach((b) => { b.disabled = name === 'game'; });
+
+    // 非游戏页切换后把焦点移入当前页面；游戏页由答案框接管焦点。
+    if (name !== 'game') {
+      window.requestAnimationFrame(() => {
+        const screen = $('#screen-' + name);
+        const target = screen && screen.querySelector('h2, [data-back], button:not([disabled])');
+        if (!target) return;
+        const temporaryTabIndex = target.tagName === 'H2';
+        if (temporaryTabIndex) target.setAttribute('tabindex', '-1');
+        target.focus({ preventScroll: true });
+        if (temporaryTabIndex) {
+          target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true });
+        }
+      });
+    }
   }
 
   function showFeedback(msg, cls) {
@@ -391,17 +447,53 @@
     box2.value = '';
     box1.placeholder = q.isDiv ? '商' : '';
     box2.placeholder = '余';
+    box1.setAttribute('aria-label', q.isDiv ? '商' : '答案');
+    box2.setAttribute('aria-label', '余数');
     focusBox(1);
   }
 
+  function clearNextTimer() {
+    if (state.nextTimer) clearTimeout(state.nextTimer);
+    state.nextTimer = null;
+  }
+
   function nextQuestion() {
+    state.nextTimer = null;
     state.locked = false;
     $('#questionCard').classList.remove('correct', 'wrong');
     state.question = genQuestion();
     renderQuestion();
   }
 
+  function scheduleNextQuestion(delay) {
+    clearNextTimer();
+    if (state.mode === 'adventure') {
+      const runId = state.adv && state.adv.runId;
+      const timerId = setTimeout(() => {
+        if (state.nextTimer === timerId) state.nextTimer = null;
+        if (state.mode !== 'adventure' || state.screen !== 'game' || !state.adv
+          || state.adv.runId !== runId || state.adv.cancelled || state.adv.ending) return;
+        if (state.adv.qIndex >= advLevel().count) {
+          loseAdventure('exhausted');
+          return;
+        }
+        nextQuestion();
+      }, delay);
+      state.nextTimer = timerId;
+      return;
+    }
+
+    const mode = state.mode;
+    const timerId = setTimeout(() => {
+      if (state.nextTimer === timerId) state.nextTimer = null;
+      if (state.mode !== mode || state.screen !== 'game') return;
+      nextQuestion();
+    }, delay);
+    state.nextTimer = timerId;
+  }
+
   function startQuestionFlow() {
+    clearNextTimer();
     showFeedback('', '');
     nextQuestion();
   }
@@ -440,6 +532,10 @@
 
   function submitAnswer() {
     if (state.locked) return;
+    if (state.mode === 'challenge' && Date.now() >= state.deadline) {
+      endChallenge();
+      return;
+    }
     const q = state.question;
     const box1 = $('#box1');
     const box2 = $('#box2');
@@ -490,7 +586,7 @@
       state.pCorrect += 1;
     }
     updateGameBar();
-    if (going) state.nextTimer = setTimeout(nextQuestion, CONFIG.correctDelay);
+    if (going) scheduleNextQuestion(CONFIG.correctDelay);
   }
 
   function onWrong() {
@@ -511,14 +607,7 @@
     updateGameBar();
     if (going) {
       const delay = state.mode === 'adventure' ? CONFIG.wrongDelay + 300 : CONFIG.wrongDelay;
-      state.nextTimer = setTimeout(() => {
-        // 闯关：题目答完公主仍未到达 → 失败
-        if (state.mode === 'adventure' && !state.adv.ending && state.adv.qIndex >= WORLDS[state.adv.wid].levels[state.adv.lid].count) {
-          loseAdventure('exhausted');
-        } else {
-          nextQuestion();
-        }
-      }, delay);
+      scheduleNextQuestion(delay);
     }
   }
 
@@ -578,7 +667,12 @@
   /* ---------------- 模式启动 / 结束 ---------------- */
 
   function startPractice() {
+    cancelAdventureRun();
+    stopTimer();
+    clearNextTimer();
     state.mode = 'practice';
+    state.streak = 0;
+    state.maxStreak = 0;
     state.pCorrect = 0;
     state.pWrong = 0;
     $('#timerRow').hidden = true;
@@ -588,6 +682,9 @@
   }
 
   function startChallenge() {
+    cancelAdventureRun();
+    stopTimer();
+    clearNextTimer();
     state.mode = 'challenge';
     state.score = 0;
     state.streak = 0;
@@ -602,7 +699,7 @@
   }
 
   function endPractice() {
-    clearTimeout(state.nextTimer);
+    clearNextTimer();
     const total = state.pCorrect + state.pWrong;
     const rate = total > 0 ? Math.round((100 * state.pCorrect) / total) : 0;
     showResult({
@@ -619,13 +716,14 @@
   }
 
   function endChallenge() {
+    if (state.mode !== 'challenge' || state.screen !== 'game') return;
     stopTimer();
-    clearTimeout(state.nextTimer);
+    clearNextTimer();
     state.locked = true;
     const total = state.cCorrect + state.cWrong;
     const rate = total > 0 ? Math.round((100 * state.cCorrect) / total) : 0;
     const bestKey = 'sxd_best_' + state.difficulty;
-    const prev = loadBest(bestKey);
+    const prev = loadChallengeBest(bestKey);
     const isRecord = state.score > 0 && (prev === null || state.score > prev.score);
     if (isRecord) {
       saveBest(bestKey, {
@@ -644,8 +742,24 @@
         ['正确率', rate + '%'],
         ['最高连击', '×' + state.maxStreak],
       ],
-      best: loadBest(bestKey),
+      best: loadChallengeBest(bestKey),
       isRecord: isRecord,
+    });
+  }
+
+  function renderStatRows(container, rows) {
+    container.textContent = '';
+    rows.forEach(([key, value]) => {
+      const row = document.createElement('div');
+      row.className = 'stat-row';
+      const label = document.createElement('span');
+      label.className = 'stat-label';
+      label.textContent = String(key);
+      const result = document.createElement('span');
+      result.className = 'stat-value';
+      result.textContent = String(value);
+      row.append(label, result);
+      container.appendChild(row);
     });
   }
 
@@ -654,16 +768,22 @@
     $('#starsRow').hidden = true;
     $('#advBtns').hidden = true;
     $('#normalBtns').hidden = false;
-    $('#resultStats').innerHTML = opts.lines
-      .map(([k, v]) => '<div class="stat-row"><span class="stat-label">' + k + '</span><span class="stat-value">' + v + '</span></div>')
-      .join('');
+    renderStatRows($('#resultStats'), opts.lines);
 
     const bestBox = $('#bestBox');
+    bestBox.textContent = '';
     if (opts.best) {
       const b = opts.best;
-      const rec = opts.isRecord ? '<div class="record-tip">🎉 新纪录！太厉害了！</div>' : '';
-      bestBox.innerHTML =
-        '<div>🏆 历史最佳：' + b.score + ' 分（答对 ' + b.correct + ' 题 · 连击 ×' + b.maxStreak + '，' + b.date + '）</div>' + rec;
+      const summary = document.createElement('div');
+      summary.textContent = '🏆 历史最佳：' + b.score + ' 分（答对 ' + b.correct
+        + ' 题 · 连击 ×' + b.maxStreak + '，' + b.date + '）';
+      bestBox.appendChild(summary);
+      if (opts.isRecord) {
+        const record = document.createElement('div');
+        record.className = 'record-tip';
+        record.textContent = '🎉 新纪录！太厉害了！';
+        bestBox.appendChild(record);
+      }
       bestBox.hidden = false;
     } else {
       bestBox.hidden = true;
@@ -674,18 +794,39 @@
   /* ---------------- 纪录存取 ---------------- */
 
   function loadBest(key) {
-    try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+    const raw = storageGet(key);
+    if (raw === null) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function normalizeChallengeBest(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const score = Math.trunc(Number(value.score));
+    const correct = Math.trunc(Number(value.correct));
+    const maxStreak = Math.trunc(Number(value.maxStreak));
+    if (![score, correct, maxStreak].every(Number.isFinite)
+      || score < 0 || correct < 0 || maxStreak < 0) return null;
+    return {
+      score,
+      correct,
+      maxStreak,
+      date: String(value.date || '').slice(0, 32),
+    };
+  }
+
+  function loadChallengeBest(key) {
+    return normalizeChallengeBest(loadBest(key));
   }
 
   function saveBest(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* 忽略 */ }
+    storageSet(key, JSON.stringify(val));
   }
 
   function renderHomeBest() {
     const fmt = (x) => (x ? x.score + ' 分' : '暂无');
-    const b = loadBest('sxd_best_basic');
-    const a = loadBest('sxd_best_advanced');
-    $('#homeBest').innerHTML =
+    const b = loadChallengeBest('sxd_best_basic');
+    const a = loadChallengeBest('sxd_best_advanced');
+    $('#homeBest').textContent =
       '🏆 挑战纪录　基础：' + fmt(b) + '　·　进阶：' + fmt(a);
   }
 
@@ -754,10 +895,9 @@
 
   // 累计答对里程碑：每 50 题全屏庆祝
   function bumpTotalCorrect() {
-    let total = 0;
-    try { total = parseInt(localStorage.getItem('sxd_total'), 10) || 0; } catch (e) { /* 忽略 */ }
+    let total = parseInt(storageGet('sxd_total'), 10) || 0;
     total += 1;
-    try { localStorage.setItem('sxd_total', String(total)); } catch (e) { /* 忽略 */ }
+    storageSet('sxd_total', String(total));
     if (total % 50 === 0) {
       iceFirework();
       showFeedback('累计答对 ' + total + ' 题！🎉 冰晶绽放！', 'ok');
@@ -768,7 +908,7 @@
    * 闯关冒险：追逐引擎
    * ============================================================ */
   function advLevel() { return WORLDS[state.adv.wid].levels[state.adv.lid]; }
-  function advLevelId() { return state.adv.wid * 4 + state.adv.lid; }
+  function advLevelId() { return levelId(state.adv.wid, state.adv.lid); }
 
   // 逻辑位置 0-1 映射到跑道像素：公主从 22% 跑到 82%（终点水晶旁），
   // 负位置（怪兽落后的 lag）向左展开到 4%，保证开局两者视觉间隔明显
@@ -797,9 +937,11 @@
 
   function startChaseTimer() {
     stopChaseTimer();
+    const runId = state.adv.runId;
     let lastTick = performance.now();
     state.adv.timer = setInterval(() => {
-      if (state.screen !== 'game' || state.adv.ending) return;
+      if (!state.adv || state.adv.runId !== runId || state.adv.cancelled
+        || state.screen !== 'game' || state.adv.ending) return;
       const ch = CONFIG.chase;
       // 用真实流逝时间推进（后台节流回来最多补 3 秒，避免怪兽瞬间贴脸）
       const now = performance.now();
@@ -858,17 +1000,23 @@
   }
 
   function startAdventure(wid, lid) {
+    const entry = LEVELS.find((item) => item.wid === wid && item.lid === lid);
+    if (!entry) return;
+    cancelAdventureRun();
+    stopTimer();
     const ch = CONFIG.chase;
     state.mode = 'adventure';
     state.streak = 0;
     state.maxStreak = 0;
     state.adv = {
-      wid: wid, lid: lid,
+      wid, lid,
+      runId: ++state.adventureRunSeq,
       qIndex: 0, correct: 0, wrong: 0,
       princess: 0, monster: -ch.lag,
-      speed: 0, timer: null, ending: false,
+      speed: 0, timer: null, resultTimer: null,
+      ending: false, cancelled: false,
     };
-    const lv = WORLDS[wid].levels[lid];
+    const lv = entry.level;
     const secPerQ = lv.boss ? ch.bossSecPerQ : ch.secPerQ;
     state.adv.speed = (1 + ch.lag) / ((lv.count + ch.extraQ) * secPerQ);
     $('#timerRow').hidden = true;
@@ -881,15 +1029,28 @@
   }
 
   function stopAdventure() {
+    clearNextTimer();
     stopChaseTimer();
+    if (state.adv && state.adv.resultTimer) clearTimeout(state.adv.resultTimer);
+    if (state.adv) state.adv.resultTimer = null;
     $('#chaseScene').hidden = true;
     document.body.classList.remove('dim');
   }
 
+  function cancelAdventureRun() {
+    if (state.adv) {
+      state.adv.cancelled = true;
+      state.adv.ending = true;
+    }
+    stopAdventure();
+  }
+
   function winAdventure() {
-    if (state.adv.ending) return;
+    if (!state.adv || state.adv.ending || state.adv.cancelled) return;
     state.adv.ending = true;
+    clearNextTimer();
     stopChaseTimer();
+    const runId = state.adv.runId;
     const lv = advLevel();
     // 星星按「实际作答」的正确率：零失误通关即 3 星（不除以总题数）
     const answered = state.adv.correct + state.adv.wrong;
@@ -903,19 +1064,27 @@
     playLevelWin();
     const c = centerOf($('#chasePrincess'));
     spawnParticles(c.x, c.y, 30, { colors: CONFETTI_COLORS, snow: true });
-    setTimeout(() => showAdvResult(true, stars), 1100);
+    state.adv.resultTimer = setTimeout(() => {
+      if (!state.adv || state.adv.runId !== runId || state.adv.cancelled) return;
+      state.adv.resultTimer = null;
+      showAdvResult(true, stars);
+    }, 1100);
   }
 
   function loseAdventure(reason) {
-    if (state.adv.ending) return;
+    if (!state.adv || state.adv.ending || state.adv.cancelled) return;
     state.adv.ending = true;
+    clearNextTimer();
     stopChaseTimer();
+    const runId = state.adv.runId;
     playAdvLose();
     document.body.classList.add('dim');
     // 怪兽扑向公主
     state.adv.monster = state.adv.princess - 0.015;
     placeRunner($('#chaseMonster'), state.adv.monster);
-    setTimeout(() => {
+    state.adv.resultTimer = setTimeout(() => {
+      if (!state.adv || state.adv.runId !== runId || state.adv.cancelled) return;
+      state.adv.resultTimer = null;
       document.body.classList.remove('dim');
       showAdvResult(false, 0, reason);
     }, 1000);
@@ -925,18 +1094,17 @@
     stopAdventure();
     const lv = advLevel();
     const w = WORLDS[state.adv.wid];
-    const total = state.adv.correct + state.adv.wrong;
     const cleared = advUnlockedTo(loadAdvStars()) >= TOTAL_LEVELS;
 
     $('#resultTitle').textContent = won
       ? (advLevelId() === TOTAL_LEVELS - 1 ? '👑 恶龙被打败，王国获救啦！' : '🎉 公主到达终点！')
       : (reason === 'caught' ? '😱 怪兽追上公主了！' : '🏃 题目答完还没到达…');
-    $('#resultStats').innerHTML = [
+    renderStatRows($('#resultStats'), [
       ['世界', w.emoji + ' ' + w.name + ' · ' + lv.name],
       ['答对', state.adv.correct + ' 题（需 ' + lv.need + '）'],
       ['水晶碎片', won ? '💎 已收集！' : '下次再来'],
       ['最高连击', '×' + state.maxStreak],
-    ].map(([k, v]) => '<div class="stat-row"><span class="stat-label">' + k + '</span><span class="stat-value">' + v + '</span></div>').join('');
+    ]);
 
     // 星星动画：先复位再逐颗弹出
     const starsRow = $('#starsRow');
@@ -982,7 +1150,7 @@
       const row = document.createElement('div');
       row.className = 'map-levels';
       w.levels.forEach((lv, li) => {
-        const id = wi * 4 + li;
+        const id = levelId(wi, li);
         const unlocked = id <= unlockedTo;
         const got = stars[id] || 0;
         const node = document.createElement('button');
@@ -1026,8 +1194,8 @@
   $$('[data-back]').forEach((btn) => {
     btn.addEventListener('click', () => {
       stopTimer();
-      stopAdventure();
-      clearTimeout(state.nextTimer);
+      cancelAdventureRun();
+      clearNextTimer();
       renderHomeBest();
       renderHomeAdv();
       showScreen('home');
@@ -1036,13 +1204,16 @@
 
   // 闯关结果按钮
   $('#nextLevelBtn').addEventListener('click', () => {
-    const id = advLevelId() + 1;
-    startAdventure(Math.floor(id / 4), id % 4);
+    const next = levelAt(advLevelId() + 1);
+    if (next) startAdventure(next.wid, next.lid);
   });
   $('#retryBtn').addEventListener('click', () => {
-    startAdventure(state.adv.wid, state.adv.lid);
+    if (!state.adv) return;
+    const { wid, lid } = state.adv;
+    startAdventure(wid, lid);
   });
   $('#mapBtn').addEventListener('click', () => {
+    cancelAdventureRun();
     renderMap();
     showScreen('map');
   });
@@ -1064,10 +1235,17 @@
   });
 
   // 音效开关
+  function updateSoundButton() {
+    const btn = $('#soundBtn');
+    btn.textContent = state.soundOn ? '🔊' : '🔇';
+    btn.setAttribute('aria-pressed', String(state.soundOn));
+    btn.setAttribute('aria-label', state.soundOn ? '关闭音效' : '开启音效');
+  }
+
   $('#soundBtn').addEventListener('click', () => {
     state.soundOn = !state.soundOn;
-    try { localStorage.setItem('sxd_sound', state.soundOn ? '1' : '0'); } catch (e) { /* 忽略 */ }
-    $('#soundBtn').textContent = state.soundOn ? '🔊' : '🔇';
+    storageSet('sxd_sound', state.soundOn ? '1' : '0');
+    updateSoundButton();
   });
 
   // 练习设置
@@ -1099,7 +1277,7 @@
   // 结束本轮
   $('#quitBtn').addEventListener('click', () => {
     if (state.mode === 'challenge') endChallenge();
-    else if (state.mode === 'adventure') { stopAdventure(); renderMap(); showScreen('map'); }
+    else if (state.mode === 'adventure') { cancelAdventureRun(); renderMap(); showScreen('map'); }
     else endPractice();
   });
 
@@ -1140,7 +1318,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       submitAnswer();
-    } else if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       if (!$('#remSlot').hidden) {
         e.preventDefault();
         focusBox(state.activeBox === 1 ? 2 : 1);
@@ -1153,7 +1331,7 @@
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  $('#soundBtn').textContent = state.soundOn ? '🔊' : '🔇';
+  updateSoundButton();
   updateSetupHint();
   updateSetup();
   renderHomeBest();
