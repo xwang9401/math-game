@@ -734,8 +734,16 @@ h2 {
 .chase-runner .arm { transform-origin: 50% 0; animation: legSwing 0.32s ease-in-out infinite alternate-reverse; }
 @keyframes legSwing { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
 .chase-runner.paused .leg, .chase-runner.paused .arm { animation-play-state: paused; }
-.chase-monster svg { animation: monsterBob 0.7s ease-in-out infinite; }
-@keyframes monsterBob { 50% { transform: translateY(-3px) rotate(-2deg); } }
+.chase-monster svg { animation: monsterLunge 2.2s ease-in-out infinite; }
+/* 前扑蓄势：周期性向公主方向猛扑一下再回位，让"正在逼近"随时可见 */
+@keyframes monsterLunge {
+  0%, 100% { transform: translateX(0); }
+  42% { transform: translateX(11px) scale(1.05); }
+  58% { transform: translateX(6px); }
+}
+.chase-track.danger .chase-monster svg { animation-duration: 1.1s; }
+.chase-track.danger .chase-princess .leg,
+.chase-track.danger .chase-princess .arm { animation-duration: 0.18s; }
 .chase-track.danger + .chase-tip::before { content: '⚠️ '; }
 .chase-princess.win svg { animation: princessJump 0.5s ease-in-out 2; }
 @keyframes princessJump { 50% { transform: translateY(-12px); } }

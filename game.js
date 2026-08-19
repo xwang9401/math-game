@@ -21,13 +21,13 @@
     correctDelay: 800,      // 答对后自动进入下一题（毫秒）
     wrongDelay: 1600,       // 答错后停留（毫秒）
     chase: {
-      lag: 0.18,            // 怪兽初始落后公主的距离（0-1）
-      wrongStep: 0.05,      // 每答错一题怪兽额外前进
+      lag: 0.30,            // 怪兽初始落后公主的距离（0-1）
+      wrongStep: 0.045,     // 每答错一题怪兽额外前进
       margin: 0.03,         // 贴身判定余量（怪兽贴到这个距离内算追上）
       dangerDist: 0.15,     // 紧张阈值：距离小于此值触发红光/心跳（须小于初始安全距离 lag）
-      extraQ: 3,            // 怪兽速度标定：按（题数+3）的答题总耗时走完全程
-      secPerQ: 13,          // 普通关每题期望耗时（秒）
-      bossSecPerQ: 11,      // Boss 关每题期望耗时（秒），更快
+      extraQ: 2,            // 怪兽速度标定：按（题数+2）的答题总耗时走完全程
+      secPerQ: 10,          // 普通关每题期望耗时（秒）
+      bossSecPerQ: 9,       // Boss 关每题期望耗时（秒），更快
       tickMs: 500,          // 怪兽推进的定时器间隔
     },
   };
@@ -770,11 +770,12 @@
   function advLevel() { return WORLDS[state.adv.wid].levels[state.adv.lid]; }
   function advLevelId() { return state.adv.wid * 4 + state.adv.lid; }
 
-  // 位置 0-1 映射到跑道横向像素（终点前留出水晶位置）
+  // 逻辑位置 0-1 映射到跑道像素：公主从 22% 跑到 82%（终点水晶旁），
+  // 负位置（怪兽落后的 lag）向左展开到 4%，保证开局两者视觉间隔明显
   function placeRunner(el, pos) {
     const track = $('#chaseTrack');
     const w = track.clientWidth;
-    const x = Math.max(2, (0.04 + Math.min(pos, 1.05) * 0.86) * w);
+    const x = Math.max(2, (0.22 + Math.max(pos, -CONFIG.chase.lag) * 0.60) * w);
     el.style.transform = 'translateX(' + x.toFixed(1) + 'px)';
   }
 
@@ -872,8 +873,8 @@
     state.adv.speed = (1 + ch.lag) / ((lv.count + ch.extraQ) * secPerQ);
     $('#timerRow').hidden = true;
     $('#chaseScene').hidden = false;
-    setupChaseUI();
-    showScreen('game');
+    showScreen('game');          // 先切换屏幕让跑道完成布局，再摆放角色
+    setupChaseUI();              // 否则 clientWidth 为 0，开局位置全部塌缩到最左
     updateGameBar();
     startQuestionFlow();
     startChaseTimer();
