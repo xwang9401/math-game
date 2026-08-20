@@ -43,6 +43,14 @@
             <span class="adv-progress" id="homeAdv"></span>
           </span>
         </button>
+        <button class="mode-card scrolls" data-mode="scrolls">
+          <span class="mode-emoji">📖</span>
+          <span class="adv-card-text">
+            <span class="mode-name">速算秘籍 · 巧算上卷</span>
+            <span class="mode-desc">学会 8 个速算口诀，做题又快又准！</span>
+            <span class="adv-progress" id="homeScrolls"></span>
+          </span>
+        </button>
         <button class="mode-card" data-mode="practice">
           <span class="mode-emoji">📝</span>
           <span class="mode-name">练习模式</span>
@@ -65,6 +73,37 @@
       </div>
       <div id="finaleBanner" class="finale-banner" hidden>👑 水晶集齐！点最终关开启大结局 👑</div>
       <div class="map-worlds" id="mapWorlds"></div>
+    </section>
+
+    <!-- ========== 速算秘籍书架 ========== -->
+    <section id="screen-scrolls" class="screen">
+      <div class="map-head">
+        <button class="btn ghost small" data-back>← 返回</button>
+        <div class="map-crystal" id="scrollsProgress">🌟 掌握 0 / 8</div>
+      </div>
+      <div id="scrollsMaster" class="finale-banner" hidden>👑 上卷全部掌握 · 速算大师就是你！👑</div>
+      <div class="scroll-shelf" id="scrollShelf"></div>
+      <p class="chase-tip" id="scrollTip" aria-live="polite"></p>
+    </section>
+
+    <!-- ========== 秘籍学习卡 ========== -->
+    <section id="screen-scrollLearn" class="screen">
+      <div class="map-head">
+        <button class="btn ghost small" id="scrollBackBtn" type="button">← 秘籍</button>
+        <div class="map-crystal" id="scrollStars"></div>
+      </div>
+      <div class="scroll-detail">
+        <div class="scroll-title" id="scrollTitle"></div>
+        <div class="scroll-mantra" id="scrollMantra"></div>
+        <div class="scroll-demo" id="scrollDemo"></div>
+        <div class="btn-row">
+          <button id="demoNextBtn" class="btn ghost" type="button">下一步 ▸</button>
+        </div>
+        <div class="btn-row">
+          <button id="scrollDrillBtn" class="btn primary" type="button">开始演练 ✏️</button>
+          <button id="scrollTestBtn" class="btn ghost" type="button" disabled>考验需先完成演练</button>
+        </div>
+      </div>
     </section>
 
     <!-- ========== 练习设置 ========== -->
@@ -157,6 +196,12 @@
         <button id="nextLevelBtn" class="btn primary">下一关 →</button>
         <button id="retryBtn" class="btn primary">再试一次</button>
         <button id="mapBtn" class="btn ghost">回地图</button>
+      </div>
+      <div class="btn-row" id="scrollBtns" hidden>
+        <button id="scrollNextBtn" class="btn primary" type="button">下一张秘籍 →</button>
+        <button id="scrollGoTestBtn" class="btn primary" type="button">掌握考验 🌟</button>
+        <button id="scrollAgainBtn" class="btn ghost" type="button">再演练一次</button>
+        <button id="scrollShelfBtn" class="btn ghost" type="button">返回秘籍</button>
       </div>
     </section>
 

@@ -223,6 +223,7 @@ h2 {
 /* ---------- 按钮 ---------- */
 .btn-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: center;
   margin-top: 20px;
@@ -410,6 +411,8 @@ h2 {
   font-weight: 800;
   text-align: center;
   margin: 14px 0 6px;
+  white-space: pre-line;   /* 秘籍分步提示按行展示 */
+  line-height: 1.5;
 }
 
 .feedback.ok { color: #1fa75a; }
@@ -800,21 +803,186 @@ body.dim::after {
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
+/* ---------- 首页：速算秘籍卡片 ---------- */
+.mode-card.scrolls {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  background: linear-gradient(120deg, #fff3d6 0%, #ffe9c7 55%, #ffdde0 100%);
+  border: 3px solid #f3c96b;
+}
+.mode-card.scrolls .mode-emoji { font-size: 44px; }
+.mode-card.scrolls .mode-name { color: #b06a1d; }
+.mode-card.scrolls .mode-desc { text-align: left; }
+.mode-card.scrolls .adv-progress { color: #b06a1d; }
+
+/* ---------- 秘籍书架 ---------- */
+.scroll-shelf {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.scroll-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff;
+  border: 3px solid #e8dcc8;
+  border-radius: 16px;
+  padding: 14px 10px 12px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  font-family: inherit;
+  text-align: left;
+}
+.scroll-item:active { transform: scale(0.96); }
+.scroll-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+}
+.scroll-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  background: #fdf0d5;
+  color: #b06a1d;
+  flex: none;
+}
+.scroll-item-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #43506a;
+  line-height: 1.25;
+}
+.scroll-item-mantra {
+  font-size: 11.5px;
+  color: #9a8a6a;
+  line-height: 1.45;
+}
+.scroll-item-stars {
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: #f5b301;
+  min-height: 18px;
+}
+.scroll-item.locked { opacity: 0.55; cursor: not-allowed; }
+.scroll-item.locked .scroll-num { background: #ede5d8; color: #9a8a6a; }
+.scroll-item.current { border-color: #f5a623; animation: nodePulse 1.4s ease-in-out infinite; }
+
+/* ---------- 秘籍学习卡 ---------- */
+.scroll-detail {
+  background: #fffdf6;
+  border: 3px solid #eadfc8;
+  border-radius: 20px;
+  padding: 18px 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+.scroll-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #43506a;
+  text-align: center;
+}
+.scroll-mantra {
+  margin: 10px 0 14px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  color: #b06a1d;
+  background: linear-gradient(120deg, #fff3d6, #ffe3f3);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.demo-block { margin-bottom: 12px; }
+.demo-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a8a6a;
+  margin-bottom: 4px;
+}
+.demo-q {
+  font-size: 24px;
+  font-weight: 800;
+  color: #2c3e50;
+  font-variant-numeric: tabular-nums;
+  background: #f4f8fd;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.demo-step {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: #fdfbf3;
+  border: 1.5px dashed #e3d5b3;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.demo-step.shown {
+  display: flex;
+  animation: stepIn 0.35s ease;
+}
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(8px); }
+}
+.demo-step-label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: #b06a1d;
+  background: #fdf0d5;
+  border-radius: 8px;
+  padding: 4px 8px;
+  max-width: 104px;
+  text-align: center;
+}
+.demo-step-expr {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2c3e50;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 秘籍题面较长（连加 / 区间求和）时缩小字号，避免溢出 */
+.question-text.small { font-size: 30px; letter-spacing: 1px; }
+
 /* ---------- 小屏适配 ---------- */
 @media (max-width: 380px) {
   .question-text { font-size: 36px; letter-spacing: 2px; }
+  .question-text.small { font-size: 24px; letter-spacing: 1px; }
   .answer-box { width: 92px; height: 56px; font-size: 32px; }
   .remainder-slot .answer-box { width: 76px; }
   .key { height: 56px; font-size: 23px; }
   .mode-card { padding: 20px 10px; }
   .mode-card.adventure { padding: 14px 12px; gap: 10px; }
   .mode-card.adventure .mode-emoji { font-size: 36px; }
+  .mode-card.scrolls { padding: 14px 12px; gap: 10px; }
+  .mode-card.scrolls .mode-emoji { font-size: 36px; }
   .chase-track { height: 70px; }
   .chase-runner { width: 36px; height: 44px; }
   .chase-goal { width: 42px; }
   .map-levels { grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .map-node .node-name { font-size: 10px; }
   .big-star { font-size: 42px; }
+  .scroll-shelf { gap: 8px; }
+  .scroll-item { padding: 10px 8px; }
+  .scroll-item-name { font-size: 13px; }
+  .scroll-num { width: 28px; height: 28px; font-size: 14px; }
+  .demo-q { font-size: 20px; }
+  .demo-step-expr { font-size: 15px; }
 }
 
 /* ---------- 减少动态效果 ---------- */

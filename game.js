@@ -20,6 +20,12 @@
     streakBonusStep: 2,     // 连击加分：每多连击 1 次多 2 分
     correctDelay: 800,      // 答对后自动进入下一题（毫秒）
     wrongDelay: 1600,       // 答错后停留（毫秒）
+    scrollDrillCount: 5,    // 秘籍演练题数
+    scrollTestCount: 8,     // 秘籍掌握考验题数
+    scrollTestPass: 7,      // 通过考验所需答对数
+    scrollTestSecs: 15,     // 考验每题限时（秒）
+    scrollHintDelay: 4500,  // 秘籍答错后展示分步提示的停留（毫秒）
+    scrollEndDelay: 900,    // 最后一题答完到结算的间隔（毫秒）
     chase: {
       lag: 0.30,            // 怪兽初始落后公主的距离（0-1）
       wrongStep: 0.045,     // 每答错一题怪兽额外前进
@@ -228,6 +234,9 @@
     cCorrect: 0, cWrong: 0,  // 挑战统计
     adv: null,               // 闯关状态 { wid, lid, qIndex, correct, wrong, princess, monster, speed, timer, ending }
     adventureRunSeq: 0,
+    scroll: null,            // 秘籍运行状态 { index, kind, runId, qIndex, correct, wrong, timerId, ... }
+    scrollRunSeq: 0,
+    scrollLearn: null,       // 学习屏状态 { index, revealed, total }
     soundOn: storageGet('sxd_sound') !== '0',
   };
 
@@ -318,6 +327,10 @@
 
   function genQuestion() {
     let type, diff;
+    if (state.mode === 'scroll') {
+      // 秘籍模式：定向出题，保证题目必然符合当前技巧的特征
+      return Object.assign({ type: 'scroll' }, SCROLLS[state.scroll.index].gen());
+    }
     if (state.mode === 'adventure') {
       const lv = WORLDS[state.adv.wid].levels[state.adv.lid];
       type = pick(lv.types);
@@ -440,6 +453,8 @@
     const remKey = $('#remKey');
 
     $('#questionText').textContent = q.text;
+    // 秘籍题面（连加 / 区间求和）较长时缩小字号，避免溢出
+    $('#questionText').classList.toggle('small', q.text.length > 11);
     const hasRem = q.isDiv && q.remainder > 0;   // 只有真正带余数的除法才有第二个框
     remSlot.hidden = !hasRem;
     remKey.hidden = !hasRem;
@@ -460,9 +475,14 @@
   function nextQuestion() {
     state.nextTimer = null;
     state.locked = false;
+    if (state.scroll) state.scroll.awaitSkip = false;
     $('#questionCard').classList.remove('correct', 'wrong');
     state.question = genQuestion();
     renderQuestion();
+    if (state.mode === 'scroll' && state.scroll && state.scroll.kind === 'test'
+      && !state.scroll.ended && !state.scroll.cancelled) {
+      startScrollQTimer();
+    }
   }
 
   function scheduleNextQuestion(delay) {
@@ -531,7 +551,16 @@
   }
 
   function submitAnswer() {
-    if (state.locked) return;
+    if (state.locked) {
+      // 秘籍答错后的分步提示较长，允许点 ✓ / 回车提前继续
+      if (state.mode === 'scroll' && state.scroll && state.scroll.awaitSkip) {
+        state.scroll.awaitSkip = false;
+        clearNextTimer();
+        nextQuestion();
+      }
+      return;
+    }
+    if (state.mode === 'scroll') stopScrollQTimer();
     if (state.mode === 'challenge' && Date.now() >= state.deadline) {
       endChallenge();
       return;
@@ -562,6 +591,7 @@
 
     state.locked = true;
     if (state.mode === 'adventure') state.adv.qIndex += 1;
+    if (state.mode === 'scroll') state.scroll.qIndex += 1;
     if (ok) onCorrect();
     else onWrong();
   }
@@ -571,7 +601,10 @@
     state.streak += 1;
     state.maxStreak = Math.max(state.maxStreak, state.streak);
     $('#questionCard').classList.add('correct');
-    showFeedback(pick(PRAISE), 'ok');
+    // 秘籍模式：答对时顺带复述口诀，加深记忆
+    showFeedback(state.mode === 'scroll'
+      ? pick(PRAISE) + ' 口诀：' + SCROLLS[state.scroll.index].mantra
+      : pick(PRAISE), 'ok');
     confettiAt($('#questionCard'));
     if (state.streak >= 6) iceFirework();
     bumpTotalCorrect();
@@ -582,6 +615,12 @@
     } else if (state.mode === 'adventure') {
       state.adv.correct += 1;
       going = advancePrincess();          // 公主前进一步；到达终点则进入胜利流程
+    } else if (state.mode === 'scroll') {
+      state.scroll.correct += 1;
+      if (state.scroll.qIndex >= scrollRunTotal()) {
+        going = false;
+        scheduleScrollEnd();
+      }
     } else {
       state.pCorrect += 1;
     }
@@ -595,18 +634,31 @@
     $('#questionCard').classList.add('wrong');
     const q = state.question;
     const ansText = q.isDiv && q.remainder > 0 ? q.quotient + ' 余 ' + q.remainder : String(q.answer);
-    showFeedback('正确答案是 ' + ansText + '，加油！', 'bad');
+    if (state.mode === 'scroll') {
+      // 秘籍模式的核心学习环节：答错时展示这道题自己的分步提示
+      state.scroll.awaitSkip = true;
+      showFeedback('正确答案是 ' + ansText + '\n' + q.hint.join('\n') + '\n（点 ✓ 或回车继续）', 'bad');
+    } else {
+      showFeedback('正确答案是 ' + ansText + '，加油！', 'bad');
+    }
     let going = true;
     if (state.mode === 'challenge') state.cWrong += 1;
     else if (state.mode === 'adventure') {
       state.adv.wrong += 1;
       going = advanceMonster(true);       // 怪兽逼近一步；追上则进入失败流程
+    } else if (state.mode === 'scroll') {
+      state.scroll.wrong += 1;
+      if (state.scroll.qIndex >= scrollRunTotal()) {
+        going = false;
+        scheduleScrollEnd();
+      }
     } else {
       state.pWrong += 1;
     }
     updateGameBar();
     if (going) {
-      const delay = state.mode === 'adventure' ? CONFIG.wrongDelay + 300 : CONFIG.wrongDelay;
+      const delay = state.mode === 'adventure' ? CONFIG.wrongDelay + 300
+        : state.mode === 'scroll' ? CONFIG.scrollHintDelay : CONFIG.wrongDelay;
       scheduleNextQuestion(delay);
     }
   }
@@ -622,6 +674,12 @@
     } else if (state.mode === 'challenge') {
       $('#gameModeLabel').textContent = '挑战模式 · ' + diffName;
       $('#gameStats').textContent = '得分 ' + state.score + (state.streak >= 2 ? '  🔥×' + state.streak : '');
+    } else if (state.mode === 'scroll') {
+      const sc = SCROLLS[state.scroll.index];
+      const total = scrollRunTotal();
+      $('#gameModeLabel').textContent = '📖 ' + sc.name + (state.scroll.kind === 'test' ? ' · 掌握考验' : ' · 演练');
+      $('#gameStats').textContent = '第 ' + Math.min(state.scroll.qIndex + 1, total) + '/' + total
+        + ' 题 · ✓' + state.scroll.correct;
     } else {
       const total = state.pCorrect + state.pWrong;
       const rate = total > 0 ? Math.round((100 * state.pCorrect) / total) : 0;
@@ -767,6 +825,7 @@
     $('#resultTitle').textContent = opts.title;
     $('#starsRow').hidden = true;
     $('#advBtns').hidden = true;
+    $('#scrollBtns').hidden = true;
     $('#normalBtns').hidden = false;
     renderStatRows($('#resultStats'), opts.lines);
 
@@ -1117,6 +1176,7 @@
     });
     $('#bestBox').hidden = true;
     $('#normalBtns').hidden = true;
+    $('#scrollBtns').hidden = true;
     $('#advBtns').hidden = false;
     const hasNext = advLevelId() + 1 < TOTAL_LEVELS;
     $('#nextLevelBtn').hidden = !(won && hasNext);
@@ -1178,6 +1238,559 @@
   }
 
   /* ============================================================
+   * 速算秘籍（上卷 · 速算技巧）：学 → 演练 → 掌握考验
+   * 每张秘籍 = 口诀 + 分步演示 + 定向出题器；答错时展示该题的分步提示
+   * ============================================================ */
+
+  // —— 定向出题器：生成的题目必须真正符合对应技巧的特征 ——
+
+  function genScrollTen() {
+    if (Math.random() < 0.5) {
+      // 凑十法：两个一位数相加，一定进位
+      const a = randInt(5, 9);
+      const b = randInt(6, 9);
+      const rest = a + b - 10;
+      return {
+        text: a + ' + ' + b, answer: a + b,
+        hint: ['见 ' + b + ' 想 ' + (10 - b), '拆一拆：' + a + ' = ' + (10 - b) + ' + ' + rest,
+          '先凑十：' + (10 - b) + ' + ' + b + ' = 10', '再加剩：10 + ' + rest + ' = ' + (a + b)],
+      };
+    }
+    // 连加凑整：首尾两个数凑成 100
+    const a = randInt(11, 89);
+    const b = randInt(11, 89);
+    const c = 100 - a;
+    return {
+      text: a + ' + ' + b + ' + ' + c, answer: 100 + b,
+      hint: ['找好朋友凑整：' + a + ' + ' + c + ' = 100', '再算：100 + ' + b + ' = ' + (100 + b)],
+    };
+  }
+
+  function genScrollSubProp() {
+    const a = randInt(150, 699);
+    const b = randInt(21, 79);
+    const c = 100 - b;
+    return {
+      text: a + ' − ' + b + ' − ' + c, answer: a - 100,
+      hint: ['连减 = 减去它们的和：' + b + ' + ' + c + ' = 100', '一次减掉：' + a + ' − 100 = ' + (a - 100)],
+    };
+  }
+
+  function genScrollNear100() {
+    if (Math.random() < 0.5) {
+      // 加法：第一个数接近整百
+      const base = pick([100, 200, 300, 400, 500]);
+      const d = randInt(1, 3);
+      const low = Math.random() < 0.5;
+      const a = base + (low ? -d : d);
+      const b = randInt(21, 499);
+      const mid = b + base;
+      return {
+        text: a + ' + ' + b, answer: a + b,
+        hint: ['把 ' + a + ' 看成 ' + base, base + ' + ' + b + ' = ' + mid,
+          (low ? '少算了 ' : '多算了 ') + d + '，' + (low ? '补上' : '减去')
+            + '：' + mid + (low ? ' + ' : ' − ') + d + ' = ' + (a + b)],
+      };
+    }
+    // 减法：减数接近整百
+    const base = pick([100, 200, 300, 400]);
+    const d = randInt(1, 3);
+    const low = Math.random() < 0.5;
+    const b = base + (low ? -d : d);
+    const a = b + randInt(15, 400);
+    const mid = a - base;
+    return {
+      text: a + ' − ' + b, answer: a - b,
+      hint: ['把 ' + b + ' 看成 ' + base, a + ' − ' + base + ' = ' + mid,
+        (low ? '多减了 ' : '少减了 ') + d + '，' + (low ? '加回' : '再减')
+          + '：' + mid + (low ? ' + ' : ' − ') + d + ' = ' + (a - b)],
+    };
+  }
+
+  function genScrollFold() {
+    if (Math.random() < 0.5) {
+      const a = 2 * randInt(6, 49);           // 12~98 的偶数
+      const half = a / 2;
+      return {
+        text: a + ' × 5', answer: a * 5,
+        hint: ['×5 = 先 ÷2 再 ×10', a + ' ÷ 2 = ' + half, half + ' × 10 = ' + a * 5],
+      };
+    }
+    const a = 4 * randInt(3, 24);             // 12~96（4 的倍数）
+    const quarter = a / 4;
+    return {
+      text: a + ' × 25', answer: a * 25,
+      hint: ['×25 = 先 ÷4 再 ×100', a + ' ÷ 4 = ' + quarter, quarter + ' × 100 = ' + a * 25],
+    };
+  }
+
+  function genScrollDistr() {
+    const a = randInt(13, 89);
+    if (Math.random() < 0.5) {
+      return {
+        text: a + ' × 99', answer: a * 99,
+        hint: ['99 = 100 − 1', a + ' × 100 = ' + a * 100, a * 100 + ' − ' + a + ' = ' + a * 99],
+      };
+    }
+    return {
+      text: a + ' × 101', answer: a * 101,
+      hint: ['101 = 100 + 1', a + ' × 100 = ' + a * 100, a * 100 + ' + ' + a + ' = ' + a * 101],
+    };
+  }
+
+  function genScrollEleven() {
+    const carry = Math.random() < 0.5;
+    let t, u;
+    if (carry) {
+      t = randInt(2, 9);
+      u = randInt(10 - t, 9);                 // 十位+个位 ≥ 10，需要进位
+    } else {
+      t = randInt(1, 9);
+      u = randInt(0, 9 - t);                  // 不进位
+    }
+    const a = t * 10 + u;
+    const s = t + u;
+    if (!carry) {
+      return {
+        text: a + ' × 11', answer: a * 11,
+        hint: ['两边一拉：' + t + ' ▢ ' + u, '中间相加：' + t + ' + ' + u + ' = ' + s,
+          '拼起来：' + t + s + u],
+      };
+    }
+    return {
+      text: a + ' × 11', answer: a * 11,
+      hint: ['两边一拉：' + t + ' ▢ ' + u, '中间相加：' + t + ' + ' + u + ' = ' + s + '（满十）',
+        '写 ' + (s % 10) + ' 进 1，答案是 ' + (t + 1) + (s % 10) + u],
+    };
+  }
+
+  function genScrollHeadTen() {
+    const x = randInt(2, 9);                  // 十位（头）相同
+    const y = randInt(1, 9);                  // 个位（尾）
+    const a = x * 10 + y;
+    const b = x * 10 + (10 - y);              // 个位合十
+    const head = x * (x + 1);
+    const tail = y * (10 - y);
+    return {
+      text: a + ' × ' + b, answer: a * b,
+      hint: ['条件：十位都是 ' + x + '，个位 ' + y + ' + ' + (10 - y) + ' = 10',
+        '头：' + x + ' × ' + (x + 1) + ' = ' + head,
+        '尾：' + y + ' × ' + (10 - y) + ' = ' + tail + (tail < 10 ? '（不够两位补 0 → ' + ('0' + tail) + '）' : ''),
+        '拼起来：' + head + ('0' + tail).slice(-2)],
+    };
+  }
+
+  function genScrollGauss() {
+    if (Math.random() < 0.5) {
+      const n = randInt(8, 20);
+      return {
+        text: '1 + 2 + 3 + … + ' + n, answer: n * (n + 1) / 2,
+        hint: ['首尾配对：1 + ' + n + ' = ' + (n + 1), '一共 ' + n + ' 个数：' + (n + 1) + ' × ' + n + ' = ' + n * (n + 1),
+          '每对算了两遍，÷2：' + n * (n + 1) / 2],
+      };
+    }
+    const a = randInt(12, 60);
+    const n = randInt(5, 12);
+    const b = a + n - 1;
+    return {
+      text: a + ' + ' + (a + 1) + ' + ' + (a + 2) + ' + … + ' + b, answer: (a + b) * n / 2,
+      hint: ['首尾配对：' + a + ' + ' + b + ' = ' + (a + b), '一共 ' + n + ' 个数：' + (a + b) + ' × ' + n + ' = ' + (a + b) * n,
+        '再 ÷2：' + (a + b) * n / 2],
+    };
+  }
+
+  // —— 秘籍清单（上卷 · 速算技巧，按顺序解锁）——
+  const SCROLLS = [
+    {
+      id: 'ten', emoji: '🤝', tier: '入门', name: '凑十与凑整',
+      mantra: '见 9 想 1，见 8 想 2，先凑整',
+      demos: [
+        { q: '7 + 8', steps: [['见 8 想 2', '8 和 2 是好朋友'], ['拆一拆', '7 = 2 + 5'], ['先凑十', '2 + 8 = 10'], ['再加剩下', '10 + 5 = 15']] },
+        { q: '25 + 38 + 75', steps: [['找好朋友', '25 + 75 = 100'], ['再加剩下的', '100 + 38 = 138']] },
+      ],
+      gen: genScrollTen,
+    },
+    {
+      id: 'subprop', emoji: '🪄', tier: '入门', name: '减法性质',
+      mantra: '连减两个数，等于减去它们的和',
+      demos: [
+        { q: '250 − 37 − 63', steps: [['后两数先牵手', '37 + 63 = 100'], ['一次减掉', '250 − 100 = 150']] },
+        { q: '347 − 58 − 42', steps: [['后两数先牵手', '58 + 42 = 100'], ['一次减掉', '347 − 100 = 247']] },
+      ],
+      gen: genScrollSubProp,
+    },
+    {
+      id: 'near100', emoji: '🎯', tier: '入门', name: '接近整百',
+      mantra: '先看成整百算，多退少补',
+      demos: [
+        { q: '298 + 456', steps: [['把 298 看成 300', '456 + 300 = 756'], ['多加了 2，减回去', '756 − 2 = 754']] },
+        { q: '502 − 197', steps: [['把 197 看成 200', '502 − 200 = 302'], ['多减了 3，补回来', '302 + 3 = 305']] },
+      ],
+      gen: genScrollNear100,
+    },
+    {
+      id: 'fold', emoji: '⚡', tier: '进阶', name: '×5 与 ×25',
+      mantra: '×5 折半乘十，×25 除四乘百',
+      demos: [
+        { q: '36 × 5', steps: [['先折半', '36 ÷ 2 = 18'], ['再乘 10', '18 × 10 = 180']] },
+        { q: '48 × 25', steps: [['先除以 4', '48 ÷ 4 = 12'], ['再乘 100', '12 × 100 = 1200']] },
+      ],
+      gen: genScrollFold,
+    },
+    {
+      id: 'distr', emoji: '✨', tier: '进阶', name: '×99 与 ×101',
+      mantra: '×99 少一个，×101 多一个',
+      demos: [
+        { q: '34 × 99', steps: [['99 = 100 − 1', '34 × 100 − 34'], ['算出来', '3400 − 34 = 3366']] },
+        { q: '45 × 101', steps: [['101 = 100 + 1', '45 × 100 + 45'], ['算出来', '4500 + 45 = 4545']] },
+      ],
+      gen: genScrollDistr,
+    },
+    {
+      id: 'eleven', emoji: '🔮', tier: '进阶', name: '×11 秘技',
+      mantra: '两边一拉，中间相加，满十进一',
+      demos: [
+        { q: '34 × 11', steps: [['两边一拉', '3 ▢ 4'], ['中间相加', '3 + 4 = 7 → 374']] },
+        { q: '67 × 11', steps: [['中间相加满十', '6 + 7 = 13'], ['写 3 进 1', '(6+1) 3 7 → 737']] },
+      ],
+      gen: genScrollEleven,
+    },
+    {
+      id: 'headten', emoji: '💞', tier: '高手', name: '头同尾合十',
+      mantra: '头×(头+1)，拼上尾×尾',
+      demos: [
+        { q: '23 × 27', steps: [['看条件', '十位都是 2，个位 3+7=10'], ['算头', '2 × 3 = 6'], ['算尾', '3 × 7 = 21'], ['拼一起', '6 | 21 → 621']] },
+      ],
+      gen: genScrollHeadTen,
+    },
+    {
+      id: 'gauss', emoji: '📿', tier: '高手', name: '高斯求和',
+      mantra: '(首 + 尾) × 项数 ÷ 2',
+      demos: [
+        { q: '1 + 2 + 3 + … + 10', steps: [['首尾配对', '1 + 10 = 11'], ['一共 10 个数', '11 × 10 = 110'], ['每对算了两遍', '110 ÷ 2 = 55']] },
+        { q: '21 + 22 + … + 30', steps: [['首尾配对', '21 + 30 = 51'], ['一共 10 个数', '51 × 10 = 510'], ['再除以 2', '510 ÷ 2 = 255']] },
+      ],
+      gen: genScrollGauss,
+    },
+  ];
+
+  /* ---------------- 秘籍存档与进度 ---------------- */
+  function normalizeScrollStars(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const candidate = {};
+    SCROLLS.forEach((sc, idx) => {
+      const stars = Math.trunc(Number(value[sc.id]));
+      if (Number.isInteger(stars) && stars >= 1 && stars <= 3) candidate[idx] = stars;
+    });
+    // 与闯关存档同理：必须从头连续学会，跳学的数据不采用
+    const clean = {};
+    for (let i = 0; i < SCROLLS.length && candidate[i]; i++) clean[SCROLLS[i].id] = candidate[i];
+    return clean;
+  }
+
+  function loadScrollStars() { return normalizeScrollStars(loadBest('sxd_scrolls')); }
+  function saveScrollStars(map) { saveBest('sxd_scrolls', normalizeScrollStars(map)); }
+
+  function scrollUnlockedTo(stars) {
+    let i = 0;
+    while (i < SCROLLS.length && stars[SCROLLS[i].id]) i += 1;
+    return i;   // 第一张未学会的索引；等于总数表示全部解锁
+  }
+
+  function scrollsProgressText() {
+    const stars = loadScrollStars();
+    const learned = Object.keys(stars).length;
+    const mastered = SCROLLS.filter((sc) => (stars[sc.id] || 0) >= 2).length;
+    return '📖 学会 ' + learned + '/' + SCROLLS.length + ' · 🌟 掌握 ' + mastered + '/' + SCROLLS.length;
+  }
+
+  /* ---------------- 秘籍书架屏 ---------------- */
+  let scrollTipTimer = null;
+  function scrollShelfTip(msg) {
+    const tip = $('#scrollTip');
+    tip.textContent = msg;
+    if (scrollTipTimer) clearTimeout(scrollTipTimer);
+    scrollTipTimer = setTimeout(() => { tip.textContent = ''; }, 2200);
+  }
+
+  function renderScrollShelf() {
+    const stars = loadScrollStars();
+    const unlockedTo = scrollUnlockedTo(stars);
+    const mastered = SCROLLS.filter((sc) => (stars[sc.id] || 0) >= 2).length;
+    $('#scrollsProgress').textContent = '🌟 掌握 ' + mastered + ' / ' + SCROLLS.length;
+    $('#scrollsMaster').hidden = mastered < SCROLLS.length;
+
+    const shelf = $('#scrollShelf');
+    shelf.textContent = '';
+    SCROLLS.forEach((sc, i) => {
+      const got = stars[sc.id] || 0;
+      const unlocked = i <= unlockedTo;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'scroll-item' + (unlocked ? '' : ' locked')
+        + (i === unlockedTo && unlockedTo < SCROLLS.length ? ' current' : '');
+      const head = document.createElement('span');
+      head.className = 'scroll-item-head';
+      const num = document.createElement('span');
+      num.className = 'scroll-num';
+      num.textContent = unlocked ? (i + 1) : '🔒';
+      const name = document.createElement('span');
+      name.className = 'scroll-item-name';
+      name.textContent = sc.emoji + ' ' + sc.name;
+      head.append(num, name);
+      const mantra = document.createElement('span');
+      mantra.className = 'scroll-item-mantra';
+      mantra.textContent = unlocked ? '「' + sc.mantra + '」' : '？？？';
+      const status = document.createElement('span');
+      status.className = 'scroll-item-stars';
+      status.textContent = unlocked ? [1, 2, 3].map((n) => (n <= got ? '★' : '☆')).join('') : '';
+      card.append(head, mantra, status);
+      card.addEventListener('click', () => {
+        if (!unlocked) {
+          scrollShelfTip('🔒 先学会上一张「' + SCROLLS[i - 1].name + '」就能解锁啦');
+          return;
+        }
+        playClick();
+        openScrollLearn(i);
+      });
+      shelf.appendChild(card);
+    });
+  }
+
+  /* ---------------- 秘籍学习屏 ---------------- */
+  function openScrollLearn(index) {
+    const sc = SCROLLS[index];
+    state.scrollLearn = { index, revealed: 0, total: 0 };
+    $('#scrollTitle').textContent = sc.emoji + ' ' + sc.name;
+    $('#scrollMantra').textContent = '「 ' + sc.mantra + ' 」';
+    const got = loadScrollStars()[sc.id] || 0;
+    $('#scrollStars').textContent = got >= 2
+      ? '🌟 已掌握 ' + [1, 2, 3].map((n) => (n <= got ? '★' : '☆')).join('')
+      : got === 1 ? '✏️ 已学会，去掌握考验拿星吧' : '🌱 新秘籍';
+
+    const wrap = $('#scrollDemo');
+    wrap.textContent = '';
+    sc.demos.forEach((demo, di) => {
+      const block = document.createElement('div');
+      block.className = 'demo-block';
+      if (di > 0) {
+        const tag = document.createElement('div');
+        tag.className = 'demo-tag';
+        tag.textContent = '再来看一道';
+        block.appendChild(tag);
+      }
+      const qEl = document.createElement('div');
+      qEl.className = 'demo-q';
+      qEl.textContent = demo.q + ' = ?';
+      block.appendChild(qEl);
+      demo.steps.forEach(([label, expr]) => {
+        state.scrollLearn.total += 1;
+        const step = document.createElement('div');
+        step.className = 'demo-step';
+        const lb = document.createElement('span');
+        lb.className = 'demo-step-label';
+        lb.textContent = label;
+        const ex = document.createElement('span');
+        ex.className = 'demo-step-expr';
+        ex.textContent = expr;
+        step.append(lb, ex);
+        block.appendChild(step);
+      });
+      wrap.appendChild(block);
+    });
+    applyDemoReveal();
+
+    const testBtn = $('#scrollTestBtn');
+    testBtn.disabled = got < 1;                 // 先完成演练才能考验
+    testBtn.textContent = got >= 1 ? '掌握考验 🌟' : '考验需先完成演练';
+    showScreen('scrollLearn');
+  }
+
+  function applyDemoReveal() {
+    const learn = state.scrollLearn;
+    if (!learn) return;
+    $$('#scrollDemo .demo-step').forEach((el, i) => {
+      el.classList.toggle('shown', i < learn.revealed);
+    });
+    const done = learn.revealed >= learn.total;
+    $('#demoNextBtn').textContent = done ? '重新演示 ↺' : '下一步 ▸ ' + learn.revealed + '/' + learn.total;
+  }
+
+  /* ---------------- 演练 / 考验流程 ---------------- */
+  function scrollRunTotal() {
+    return state.scroll.kind === 'test' ? CONFIG.scrollTestCount : CONFIG.scrollDrillCount;
+  }
+
+  function stopScrollQTimer() {
+    if (state.scroll && state.scroll.timerId) clearInterval(state.scroll.timerId);
+    if (state.scroll) state.scroll.timerId = null;
+  }
+
+  function updateScrollTimerBar() {
+    const left = Math.max(0, (state.scroll.qDeadline - Date.now()) / 1000);
+    $('#timerText').textContent = Math.ceil(left) + ' 秒';
+    const bar = $('#timerBar');
+    const pct = Math.max(0, Math.min(100, (left / CONFIG.scrollTestSecs) * 100));
+    bar.style.width = pct + '%';
+    bar.classList.toggle('warn', pct <= 50 && pct > 25);
+    bar.classList.toggle('danger', pct <= 25);
+    return left;
+  }
+
+  // 掌握考验：每题轻限时，到时算答错并展示分步提示
+  function startScrollQTimer() {
+    stopScrollQTimer();
+    const runId = state.scroll.runId;
+    state.scroll.qDeadline = Date.now() + CONFIG.scrollTestSecs * 1000;
+    $('#timerRow').hidden = false;
+    updateScrollTimerBar();
+    state.scroll.timerId = setInterval(() => {
+      if (!state.scroll || state.scroll.runId !== runId || state.scroll.ended
+        || state.scroll.cancelled || state.mode !== 'scroll' || state.screen !== 'game') return;
+      if (updateScrollTimerBar() <= 0) {
+        stopScrollQTimer();
+        onScrollTimeout();
+      }
+    }, 100);
+  }
+
+  function onScrollTimeout() {
+    if (!state.scroll || state.scroll.ended || state.scroll.cancelled || state.locked) return;
+    state.locked = true;
+    state.scroll.qIndex += 1;
+    state.scroll.wrong += 1;
+    state.streak = 0;
+    playWrong();
+    $('#questionCard').classList.add('wrong');
+    state.scroll.awaitSkip = true;
+    const q = state.question;
+    showFeedback('⏰ 时间到！正确答案是 ' + q.answer + '\n' + q.hint.join('\n') + '\n（点 ✓ 或回车继续）', 'bad');
+    updateGameBar();
+    if (state.scroll.qIndex >= scrollRunTotal()) scheduleScrollEnd();
+    else scheduleNextQuestion(CONFIG.scrollHintDelay);
+  }
+
+  function scheduleScrollEnd() {
+    clearNextTimer();
+    const runId = state.scroll.runId;
+    const timerId = setTimeout(() => {
+      if (state.nextTimer === timerId) state.nextTimer = null;
+      if (state.mode !== 'scroll' || state.screen !== 'game' || !state.scroll
+        || state.scroll.runId !== runId || state.scroll.cancelled || state.scroll.ended) return;
+      endScrollRun();
+    }, CONFIG.scrollEndDelay);
+    state.nextTimer = timerId;
+  }
+
+  function startScrollRun(index, kind) {
+    cancelAdventureRun();
+    cancelScrollRun();
+    stopTimer();
+    state.mode = 'scroll';
+    state.streak = 0;
+    state.maxStreak = 0;
+    state.scroll = {
+      index, kind,
+      runId: ++state.scrollRunSeq,
+      qIndex: 0, correct: 0, wrong: 0,
+      timerId: null, qDeadline: 0,
+      ended: false, cancelled: false, awaitSkip: false,
+    };
+    $('#timerRow').hidden = true;
+    $('#chaseScene').hidden = true;
+    showScreen('game');
+    updateGameBar();
+    startQuestionFlow();
+    if (kind === 'test') startScrollQTimer();
+  }
+
+  function cancelScrollRun() {
+    if (state.scroll) {
+      state.scroll.cancelled = true;
+      state.scroll.ended = true;
+    }
+    stopScrollQTimer();
+    clearNextTimer();
+  }
+
+  function endScrollRun() {
+    if (!state.scroll || state.scroll.ended) return;
+    state.scroll.ended = true;
+    stopScrollQTimer();
+    clearNextTimer();
+    state.locked = true;
+    const sc = SCROLLS[state.scroll.index];
+    const isTest = state.scroll.kind === 'test';
+    const correct = state.scroll.correct;
+    const total = scrollRunTotal();
+    // 星级：完成演练=1星；考验达标=2星；全对=3星（保留历史最高）
+    const map = loadScrollStars();
+    const prev = map[sc.id] || 0;
+    let stars = prev;
+    if (!isTest) stars = Math.max(stars, 1);
+    else if (correct >= CONFIG.scrollTestCount) stars = Math.max(stars, 3);
+    else if (correct >= CONFIG.scrollTestPass) stars = Math.max(stars, 2);
+    const learnedNow = prev < 1 && stars >= 1;
+    const masteredNow = prev < 2 && stars >= 2;
+    if (stars !== prev) {
+      map[sc.id] = stars;
+      saveScrollStars(map);
+    }
+    showScrollResult(sc, isTest, correct, total, stars, learnedNow, masteredNow);
+  }
+
+  function showScrollResult(sc, isTest, correct, total, stars, learnedNow, masteredNow) {
+    const passed = !isTest || correct >= CONFIG.scrollTestPass;
+    const perfect = isTest && correct === CONFIG.scrollTestCount;
+    $('#resultTitle').textContent = isTest
+      ? (perfect ? '🌟 完美掌握！' : passed ? '🎉 考验通过，秘籍到手！' : '💪 差一点点，再考一次！')
+      : (learnedNow ? '✏️ 演练完成，这张秘籍学会啦！' : '✏️ 演练完成！');
+    renderStatRows($('#resultStats'), [
+      ['秘籍', sc.emoji + ' ' + sc.name + ' · ' + sc.tier],
+      ['答对', correct + ' / ' + total + ' 题' + (isTest ? '（通过需 ' + CONFIG.scrollTestPass + '）' : '')],
+      ['最高连击', '×' + state.maxStreak],
+      ['上卷进度', scrollsProgressText()],
+    ]);
+
+    const starsRow = $('#starsRow');
+    if (isTest) {
+      starsRow.hidden = false;
+      [1, 2, 3].forEach((n) => {
+        const el = $('#star' + n);
+        el.className = 'big-star' + (n <= stars ? '' : ' off-star');
+        void el.offsetWidth;                   // 强制 reflow 让星星动画重新触发
+        el.classList.add('on');
+      });
+    } else {
+      starsRow.hidden = true;
+    }
+    $('#bestBox').hidden = true;
+    $('#normalBtns').hidden = true;
+    $('#advBtns').hidden = true;
+    $('#scrollBtns').hidden = false;
+    const hasNext = state.scroll.index + 1 < SCROLLS.length;
+    $('#scrollNextBtn').hidden = !(isTest && passed && hasNext);
+    $('#scrollGoTestBtn').hidden = isTest;
+    $('#scrollAgainBtn').textContent = isTest ? (passed ? '再考一次冲三星' : '再考一次') : '再演练一次';
+    if (masteredNow || perfect) {
+      playLevelWin();
+      setTimeout(iceFirework, 500);
+      const allMastered = SCROLLS.every((s) => (loadScrollStars()[s.id] || 0) >= 2);
+      if (allMastered) setTimeout(iceFirework, 1100);
+    }
+    showScreen('result');
+  }
+
+  function renderHomeScrolls() {
+    const stars = loadScrollStars();
+    const learned = Object.keys(stars).length;
+    const mastered = SCROLLS.filter((sc) => (stars[sc.id] || 0) >= 2).length;
+    $('#homeScrolls').textContent = mastered === SCROLLS.length
+      ? '👑 速算大师 · 上卷全部掌握！'
+      : '📖 学会 ' + learned + '/' + SCROLLS.length + ' · 🌟 掌握 ' + mastered + '/' + SCROLLS.length;
+  }
+
+  /* ============================================================
    * 事件绑定
    * ============================================================ */
 
@@ -1186,6 +1799,7 @@
     card.addEventListener('click', () => {
       if (card.dataset.mode === 'practice') showScreen('setup');
       else if (card.dataset.mode === 'adventure') { renderMap(); showScreen('map'); }
+      else if (card.dataset.mode === 'scrolls') { renderScrollShelf(); showScreen('scrolls'); }
       else startChallenge();
     });
   });
@@ -1195,9 +1809,11 @@
     btn.addEventListener('click', () => {
       stopTimer();
       cancelAdventureRun();
+      cancelScrollRun();
       clearNextTimer();
       renderHomeBest();
       renderHomeAdv();
+      renderHomeScrolls();
       showScreen('home');
     });
   });
@@ -1222,6 +1838,41 @@
     iceFirework();
     setTimeout(iceFirework, 700);
     setTimeout(iceFirework, 1400);
+  });
+
+  // 速算秘籍：学习屏与结算按钮
+  $('#scrollBackBtn').addEventListener('click', () => {
+    renderScrollShelf();
+    showScreen('scrolls');
+  });
+  $('#demoNextBtn').addEventListener('click', () => {
+    const learn = state.scrollLearn;
+    if (!learn) return;
+    playClick();
+    learn.revealed = learn.revealed >= learn.total ? 0 : learn.revealed + 1;
+    applyDemoReveal();
+  });
+  $('#scrollDrillBtn').addEventListener('click', () => {
+    if (state.scrollLearn) startScrollRun(state.scrollLearn.index, 'drill');
+  });
+  $('#scrollTestBtn').addEventListener('click', () => {
+    if (state.scrollLearn) startScrollRun(state.scrollLearn.index, 'test');
+  });
+  $('#scrollGoTestBtn').addEventListener('click', () => {
+    if (state.scroll) startScrollRun(state.scroll.index, 'test');
+  });
+  $('#scrollAgainBtn').addEventListener('click', () => {
+    if (state.scroll) startScrollRun(state.scroll.index, state.scroll.kind);
+  });
+  $('#scrollNextBtn').addEventListener('click', () => {
+    if (!state.scroll) return;
+    const next = state.scroll.index + 1;
+    if (next < SCROLLS.length) openScrollLearn(next);
+  });
+  $('#scrollShelfBtn').addEventListener('click', () => {
+    cancelScrollRun();
+    renderScrollShelf();
+    showScreen('scrolls');
   });
 
   // 难度切换
@@ -1278,6 +1929,7 @@
   $('#quitBtn').addEventListener('click', () => {
     if (state.mode === 'challenge') endChallenge();
     else if (state.mode === 'adventure') { cancelAdventureRun(); renderMap(); showScreen('map'); }
+    else if (state.mode === 'scroll') { cancelScrollRun(); renderScrollShelf(); showScreen('scrolls'); }
     else endPractice();
   });
 
@@ -1309,7 +1961,15 @@
 
   // 物理键盘支持
   document.addEventListener('keydown', (e) => {
-    if (state.screen !== 'game' || state.locked) return;
+    if (state.screen !== 'game') return;
+    if (state.locked) {
+      // 秘籍答错提示期间允许回车跳过等待
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAnswer();
+      }
+      return;
+    }
     if (/^[0-9]$/.test(e.key)) {
       appendDigit(e.key);
     } else if (e.key === 'Backspace') {
@@ -1336,6 +1996,7 @@
   updateSetup();
   renderHomeBest();
   renderHomeAdv();
+  renderHomeScrolls();
   showScreen('home');
 
   // 转屏 / 窗口变化时重放追逐跑道上的角色位置
