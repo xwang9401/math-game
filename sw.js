@@ -4,13 +4,17 @@
  * ============================================================ */
 'use strict';
 
-const CACHE = 'sxd-v6';
+const CACHE = 'sxd-v7';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './game.js',
+  './kids.html',
+  './kids.css',
+  './kids.js',
   './manifest.json',
+  './manifest-kids.json',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

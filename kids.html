@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数数小达人 · 幼儿数学启蒙</title>
+  <meta name="description" content="给中班小朋友的数学启蒙小游戏：数一数、认数字、比多少、5 以内加减法。大图案、点选作答、语音读题，无压力无倒计时。">
+  <link rel="stylesheet" href="kids.css">
+  <!-- PWA：添加到主屏幕 / 离线可玩（与大孩子版共用 sw.js，独立 manifest） -->
+  <link rel="manifest" href="manifest-kids.json">
+  <meta name="theme-color" content="#ff9ecb">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="数数小达人">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="logo">👶 数数小达人</div>
+    <div class="controls">
+      <button id="soundBtn" class="icon-btn" type="button" title="音效开关" aria-label="关闭音效" aria-pressed="true">🔊</button>
+      <a class="switch-link" href="./index.html">🚀 大孩子版</a>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ========== 首页 ========== -->
+    <section id="k-home" class="k-screen active">
+      <div class="k-hero">
+        <div class="k-hero-char" id="heroChar" aria-hidden="true"></div>
+        <div class="k-hero-bubble" id="heroBubble">你好呀！我是小星，一起玩吧！</div>
+      </div>
+      <div class="act-grid" id="actGrid"></div>
+      <p class="k-tip" id="kTip" aria-live="polite"></p>
+      <p class="k-note">给中班小朋友的数学启蒙 · 建议家长陪同，每玩 10~15 分钟休息一下眼睛</p>
+    </section>
+
+    <!-- ========== 游戏 ========== -->
+    <section id="k-game" class="k-screen">
+      <div class="k-bar">
+        <button class="k-home-btn" id="homeBtn" type="button" aria-label="回到首页">🏠</button>
+        <div class="k-progress" id="kProgress" aria-label="进度"></div>
+        <button class="k-speak-btn" id="speakBtn" type="button" aria-label="再读一遍题目">🔈</button>
+      </div>
+      <div class="k-prompt" id="kPrompt" role="status" aria-live="polite"></div>
+      <div class="k-stage" id="kStage"></div>
+      <div class="k-choices" id="kChoices"></div>
+    </section>
+
+    <!-- ========== 结果 ========== -->
+    <section id="k-result" class="k-screen">
+      <h2 id="kResultTitle"></h2>
+      <div class="k-stars" id="kStars">
+        <span class="k-star" id="kStar1">⭐</span>
+        <span class="k-star" id="kStar2">⭐</span>
+        <span class="k-star" id="kStar3">⭐</span>
+      </div>
+      <div class="k-result-card" id="kResultStats"></div>
+      <div class="k-btn-row">
+        <button id="againBtn" class="k-btn primary" type="button">再玩一次</button>
+        <button id="backHomeBtn" class="k-btn ghost" type="button">回首页</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 全屏特效层（彩带） -->
+  <div class="fx-layer" id="fxLayer"></div>
+
+  <script src="kids.js"></script>
+</body>
+</html>

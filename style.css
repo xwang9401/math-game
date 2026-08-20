@@ -175,6 +175,21 @@ h2 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+/* 首页 → 幼儿版（数数小达人）入口 */
+.kids-switch {
+  display: block;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(120deg, #ff9ecb, #ffb3ba);
+  padding: 12px 16px;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(214, 96, 157, 0.35);
+}
+
 /* ---------- 题型选择 ---------- */
 .type-grid {
   display: grid;
