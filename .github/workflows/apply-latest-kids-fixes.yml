@@ -1,0 +1,44 @@
+name: Apply latest kids fixes
+
+on:
+  push:
+    branches:
+      - fix/latest-kids-interactions
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply reviewed fixes
+        run: node scripts/apply-latest-kids-fixes.mjs
+
+      - name: Run regression suite
+        run: |
+          node tests/review-fixes.test.mjs
+          node tests/scrolls.test.mjs
+          node tests/kids.test.mjs
+          node tests/review-regressions.test.mjs
+          git diff --check
+
+      - name: Commit reviewed changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- kids.js sw.js tests/review-fixes.test.mjs tests/scrolls.test.mjs tests/kids.test.mjs tests/review-regressions.test.mjs
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git commit -m "Fix latest kids interaction and migration issues"
+          git push
