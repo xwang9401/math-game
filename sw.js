@@ -5,7 +5,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'sxd-';
-const CACHE = 'sxd-v14';
+const CACHE = 'sxd-v15';
 const ASSETS = [
   './',
   './index.html',

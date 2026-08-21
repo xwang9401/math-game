@@ -8,14 +8,15 @@
  *   - 零压力：没有怪兽、没有倒计时，答错轻轻提示后无限重试
  *   - 减法做成「喂小吃货」：亲手点掉要吃的实物（留下虚线幽灵位），
  *     剩下的就是答案——减法 = 拿走，看得见摸得着
- *   - 三个活动按序解锁：小加法 → 小减法 → 大冒险（10 以内混合）
+ *   - 六个活动按序解锁：小加法 → 小减法 → 大冒险 → 分果果 → 凑十 → 满十加
  * ============================================================ */
 (function () {
   'use strict';
 
   const CONFIG = {
-    roundCount: 5,       // 每轮题数
-    advanceDelay: 1400,  // 答对后停留（毫秒）
+    roundCount: 5,         // 每轮题数
+    advanceDelay: 1400,    // 普通题答对后停留（毫秒）
+    conclusionDelay: 3200, // 含单双数语音总结时，留足播放时间
   };
 
   /* ---------------- 小工具 ---------------- */
@@ -313,14 +314,13 @@
   /* ---------------- 进度存档 ---------------- */
   function normalizeKidsStars(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    const candidate = {};
-    ACTS.forEach((act, idx) => {
-      const stars = Math.trunc(Number(value[act.id]));
-      if (Number.isInteger(stars) && stars >= 1 && stars <= 3) candidate[idx] = stars;
-    });
-    // 必须从第一个活动开始连续玩过，跳着玩的数据不采用
     const clean = {};
-    for (let i = 0; i < ACTS.length && candidate[i]; i++) clean[ACTS[i].id] = candidate[i];
+    ACTS.forEach((act) => {
+      const stars = Math.trunc(Number(value[act.id]));
+      if (Number.isInteger(stars) && stars >= 1 && stars <= 3) clean[act.id] = stars;
+    });
+    // 保留所有已知活动的合法星级；是否解锁仍由 actsUnlockedTo 的连续进度决定。
+    // 这样在中间插入新活动时，旧版后段进度不会被清空。
     return clean;
   }
 
@@ -447,10 +447,18 @@
   }
 
   function setNumberChoicesEnabled(enabled) {
-    $$('#kChoices .bubble').forEach((button) => {
+    $('#kChoices .bubble').forEach((button) => {
       button.disabled = !enabled;
       button.setAttribute('aria-disabled', String(!enabled));
     });
+  }
+
+  function needsInteraction(q) {
+    return q && (q.type === 'feed' || q.type === 'carry' || q.type === 'share');
+  }
+
+  function shareFollowUp(q) {
+    return q.ask === 'each' ? '分好啦！每人分到几个？' : '分好啦！还剩几个？';
   }
 
   function buildNumberChoices(q) {
@@ -464,13 +472,13 @@
       b.addEventListener('click', () => chooseNumber(b, v));
       choices.appendChild(b);
     });
-    setNumberChoicesEnabled(q.type !== 'feed' || q.feedComplete);
+    setNumberChoicesEnabled(!needsInteraction(q) || q.interactionComplete);
   }
 
   function renderQuestion(afterIntro) {
     const act = ACTS[state.act.idx];
     const q = act.gen();
-    q.feedComplete = q.type !== 'feed';
+    q.interactionComplete = !needsInteraction(q);
     state.question = q;
     state.locked = false;
     state.act.retries = 0;
@@ -528,13 +536,10 @@
         playNom();
         speak(String(fed));
         if (fed === q.toEat) {
-          q.feedComplete = true;
+          q.interactionComplete = true;
           setNumberChoicesEnabled(true);
           appetite.classList.add('done');   // 喂饱后停止脉动提醒
-          const seq = state.runSeq;
-          setTimeout(() => {
-            if (state.screen === 'game' && state.runSeq === seq) speak('还剩几个？');
-          }, 900);
+          speak('还剩几个？', true);
         }
       }));
       row.appendChild(panel);
@@ -586,12 +591,9 @@
           playMove();
           speak(String(q.base + moved));
           if (moved === 10 - q.base) {
-            const seq = state.runSeq;
-            setTimeout(() => {
-              if (state.screen === 'game' && state.runSeq === seq) {
-                speak('装满十个啦！外面还剩 ' + (q.loose - moved) + ' 个，一共几个？');
-              }
-            }, 900);
+            q.interactionComplete = true;
+            setNumberChoicesEnabled(true);
+            speak('装满十个啦！外面还剩 ' + (q.loose - moved) + ' 个，一共几个？', true);
           }
         });
         pile.appendChild(obj);
@@ -639,9 +641,13 @@
           if (placed >= maxPlace) {
             // 奇数个的最后一个：再分就不一样多了，剩下来
             obj.classList.add('leftover');
+            obj.disabled = true;
             if (!leftoverSaid) {
               leftoverSaid = true;
+              q.interactionComplete = true;
+              setNumberChoicesEnabled(true);
               speak('分不了啦，一人一个才公平，这个剩下了！');
+              speak(shareFollowUp(q), true);
             }
             return;
           }
@@ -655,11 +661,14 @@
           (toLeft ? left.plate : right.plate).appendChild(mini);
           playMove();
           speak(toLeft ? '给小星' : '给小吃货');
-          if (placed === maxPlace && q.total % 2 === 1) {
-            const seq = state.runSeq;
-            setTimeout(() => {
-              if (state.screen === 'game' && state.runSeq === seq) speak('剩下的分不了啦！还剩几个？');
-            }, 900);
+          if (placed === maxPlace) {
+            if (q.total % 2 === 0) {
+              q.interactionComplete = true;
+              setNumberChoicesEnabled(true);
+              speak(shareFollowUp(q), true);
+            } else {
+              speak('还剩一个，点一下看看能不能公平分掉？', true);
+            }
           }
         });
         basket.appendChild(obj);
@@ -676,8 +685,10 @@
   /* ---------------- 作答 ---------------- */
   function chooseNumber(btn, value) {
     if (state.locked) return;
-    if (state.question.type === 'feed' && !state.question.feedComplete) {
-      speak('先喂饱小吃货哦');
+    if (!state.question.interactionComplete) {
+      const hint = state.question.type === 'feed' ? '先喂饱小吃货哦'
+        : state.question.type === 'carry' ? '先把十格盘装满哦' : '先把果果分完哦';
+      speak(hint);
       return;
     }
     if (value === state.question.answer) acceptAnswer(btn);
@@ -694,12 +705,13 @@
     confettiAt(btn);
     if (state.act.retries === 0) state.act.firstTry += 1;
     const seq = state.runSeq;
+    const delay = state.question.conclusion ? CONFIG.conclusionDelay : CONFIG.advanceDelay;
     setTimeout(() => {
       if (state.screen !== 'game' || state.runSeq !== seq) return;
       state.act.qIndex += 1;
       if (state.act.qIndex >= CONFIG.roundCount) showKidResult();
       else renderQuestion();
-    }, CONFIG.advanceDelay);
+    }, delay);
   }
 
   function rejectAnswer(btn) {

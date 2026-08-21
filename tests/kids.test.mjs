@@ -61,11 +61,12 @@ ${GEN_NAMES.map((n) => extractFunction(kids, n)).join('\n')}
 ${extractFunction(kids, 'numOptions')}
 ${extractConstArray(kids, 'ACTS')}
 ${extractFunction(kids, 'normalizeKidsStars')}
-globalThis.API = { ACTS, normalizeKidsStars, numOptions, ${GEN_NAMES.join(', ')} };
+${extractFunction(kids, 'actsUnlockedTo')}
+globalThis.API = { ACTS, normalizeKidsStars, actsUnlockedTo, numOptions, ${GEN_NAMES.join(', ')} };
 `;
 const ctx = {};
 vm.runInNewContext(apiSource, ctx);
-const { ACTS, normalizeKidsStars, numOptions } = ctx.API;
+const { ACTS, normalizeKidsStars, actsUnlockedTo, numOptions } = ctx.API;
 
 const eq = (actual, expected, msg) =>
   assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected), msg);
@@ -237,27 +238,33 @@ for (let i = 0; i < ROUNDS; i += 1) {
   assert.ok(sawOdd && sawEven, '奇数偶数总数都应出现');
 }
 
-// ---------- 存档校验（防篡改：必须从头连续玩过） ----------
+// ---------- 存档校验（保留合法星级，解锁仍要求连续） ----------
 eq(normalizeKidsStars(null), {});
 eq(normalizeKidsStars('x'), {});
 eq(normalizeKidsStars([]), {});
 eq(normalizeKidsStars({ add5: 1 }), { add5: 1 });
 eq(normalizeKidsStars({ add5: 3, sub5: 2 }), { add5: 3, sub5: 2 });
-eq(normalizeKidsStars({ sub5: 2 }), {});                        // 跳过第一个活动
-eq(normalizeKidsStars({ add5: 1, mix10: 3 }), { add5: 1 });      // 中间断档
+eq(normalizeKidsStars({ sub5: 2 }), { sub5: 2 });                // 合法星级保留，但活动仍处于锁定
+eq(normalizeKidsStars({ add5: 1, mix10: 3 }), { add5: 1, mix10: 3 }); // 中间断档不再删除后段星级
 eq(normalizeKidsStars({ unknown: 3, add5: 1 }), { add5: 1 });    // 未知 id 丢弃
-eq(normalizeKidsStars({ count: 2, number: 3, add5: 1 }), { add5: 1 });   // 旧版存档：已移除的 id 被丢弃
+eq(normalizeKidsStars({ count: 2, number: 3, add5: 1 }), { add5: 1 });   // 旧版已移除 id 丢弃
 eq(normalizeKidsStars({ count: 3, number: 3, more: 3, add5: 2, sub5: 1 }), { add5: 2, sub5: 1 });
 eq(normalizeKidsStars({ add5: 0 }), {});
 eq(normalizeKidsStars({ add5: 4 }), {});
 eq(normalizeKidsStars({ add5: 2.6 }), { add5: 2 });
 eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 
+const legacyFive = { add5: 3, sub5: 2, mix10: 3, make10: 2, carry: 1 };
+eq(normalizeKidsStars(legacyFive), legacyFive, '插入 share 后必须保留旧版后段星级');
+assert.equal(actsUnlockedTo(normalizeKidsStars(legacyFive)), 3, '缺少 share 时仍停在 share');
+const migrated = normalizeKidsStars({ ...legacyFive, share: 2 });
+assert.equal(actsUnlockedTo(migrated), ACTS.length, '补上 share 后旧 make10/carry 进度自动恢复');
+
 // ---------- 结构性守卫 ----------
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v14'/);
+assert.match(sw, /const CACHE = 'sxd-v15'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);

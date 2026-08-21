@@ -157,7 +157,7 @@ globalThis.gen = genScrollNear100;
   assert.ok(sawBelow && sawAbove, 'both compensation directions should be generated');
 }
 
-// ---------- Feed interaction cannot be bypassed ----------
+// ---------- Interaction-led activities cannot be bypassed ----------
 {
   const source = `
 const state = globalThis.input.state;
@@ -167,25 +167,42 @@ const rejectAnswer = () => { globalThis.counts.reject += 1; };
 ${extractFunction(kids, 'chooseNumber')}
 globalThis.api = { chooseNumber };
 `;
-  const ctx = {
-    input: { state: { locked: false, question: { type: 'feed', feedComplete: false, answer: 2 } } },
-    counts: { spoken: '', accept: 0, reject: 0 },
-  };
-  vm.runInNewContext(source, ctx);
-  ctx.api.chooseNumber({}, 2);
-  assert.equal(ctx.counts.accept, 0);
-  assert.equal(ctx.counts.reject, 0);
-  assert.match(ctx.counts.spoken, /先喂饱/);
-  ctx.input.state.question.feedComplete = true;
-  ctx.api.chooseNumber({}, 2);
-  assert.equal(ctx.counts.accept, 1);
+  for (const type of ['feed', 'carry', 'share']) {
+    const ctx = {
+      input: { state: { locked: false, question: { type, interactionComplete: false, answer: 2 } } },
+      counts: { spoken: '', accept: 0, reject: 0 },
+    };
+    vm.runInNewContext(source, ctx);
+    ctx.api.chooseNumber({}, 2);
+    assert.equal(ctx.counts.accept, 0, type);
+    assert.equal(ctx.counts.reject, 0, type);
+    assert.match(ctx.counts.spoken, /先/, type);
+    ctx.input.state.question.interactionComplete = true;
+    ctx.api.chooseNumber({}, 2);
+    assert.equal(ctx.counts.accept, 1, type);
+  }
 }
-assert.match(kids, /setNumberChoicesEnabled\(q\.type !== 'feed' \|\| q\.feedComplete\)/);
-assert.match(kids, /q\.feedComplete = true;\s*setNumberChoicesEnabled\(true\)/);
+assert.match(kids, /q\.interactionComplete = !needsInteraction\(q\)/);
+assert.match(kids, /q\.interactionComplete = true;\s*setNumberChoicesEnabled\(true\)/);
+
+// ---------- Share follow-up stays aligned with q.ask ----------
+{
+  const source = `
+${extractFunction(kids, 'shareFollowUp')}
+globalThis.followUp = shareFollowUp;
+`;
+  const ctx = {};
+  vm.runInNewContext(source, ctx);
+  assert.match(ctx.followUp({ ask: 'each' }), /每人分到几个/);
+  assert.doesNotMatch(ctx.followUp({ ask: 'each' }), /还剩几个/);
+  assert.match(ctx.followUp({ ask: 'left' }), /还剩几个/);
+}
+assert.doesNotMatch(kids, /}, 900\);/);
+assert.match(kids, /state\.question\.conclusion \? CONFIG\.conclusionDelay : CONFIG\.advanceDelay/);
 
 // ---------- Cache cleanup is namespaced ----------
 assert.match(sw, /const CACHE_PREFIX = 'sxd-'/);
-assert.match(sw, /const CACHE = 'sxd-v14'/);
+assert.match(sw, /const CACHE = 'sxd-v15'/);
 assert.match(sw, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE/);
 assert.doesNotMatch(sw, /keys\.filter\(\(key\) => key !== CACHE\)/);
 

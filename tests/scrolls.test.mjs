@@ -276,7 +276,7 @@ assert.match(game, /state\.scroll\.runId !== runId/);
 assert.match(game, /q\.hint\.join\('\\n'\)/);          // 答错必须展示分步提示
 assert.match(game, /mode !== 'scroll' \|\| state\.screen !== 'game'/);
 assert.match(game, /normalizeScrollStars\(loadBest\('sxd_scrolls'\)\)/);
-assert.match(sw, /const CACHE = 'sxd-v14'/);
+assert.match(sw, /const CACHE = 'sxd-v15'/);
 assert.match(html, /data-mode="scrolls"/);
 assert.match(html, /id="scrollShelf"/);
 assert.match(html, /id="scrollBtns"/);
