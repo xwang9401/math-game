@@ -44,7 +44,7 @@ function extractConstArray(source, name) {
 }
 
 // 在 vm 中运行 kids.js 里真实的出题器 / 活动清单 / 存档校验
-const GEN_NAMES = ['genCount', 'genNumber', 'genMore', 'genAdd5', 'genSub5', 'genMix10'];
+const GEN_NAMES = ['genAdd5', 'genSub5', 'genMix10'];
 const apiSource = `
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -70,16 +70,17 @@ const { ACTS, normalizeKidsStars, numOptions } = ctx.API;
 const eq = (actual, expected, msg) =>
   assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected), msg);
 
-// ---------- 活动清单结构 ----------
-assert.equal(ACTS.length, 6);
-const ids = new Set();
+// ---------- 活动清单结构（三个活动，入门三项已移除） ----------
+assert.equal(ACTS.length, 3);
+eq(ACTS.map((a) => a.id), ['add5', 'sub5', 'mix10']);
 for (const act of ACTS) {
-  assert.ok(act.id && !ids.has(act.id));
-  ids.add(act.id);
   assert.ok(typeof act.name === 'string' && act.name.length >= 2 && act.name.length <= 6, act.id);
   assert.ok(typeof act.tip === 'string' && act.tip.length >= 3, act.id + ' tip');
   assert.equal(typeof act.gen, 'function', act.id + ' gen');
 }
+// 已移除的活动不应残留在代码里
+assert.doesNotMatch(kids, /genCount|genNumber|genMore|'count'|'number'|'more'/);
+assert.doesNotMatch(kids, /digit-card|group-choice|groupPick|'compare'/);
 
 // ---------- 选项生成 ----------
 for (let i = 0; i < 2000; i += 1) {
@@ -90,7 +91,6 @@ for (let i = 0; i < 2000; i += 1) {
   assert.ok(opts.includes(answer), `answer=${answer}`);
   opts.forEach((v) => assert.ok(v >= 0 && v <= 12, `answer=${answer}`));
 }
-// 极端值也能凑满 3 个选项
 for (const answer of [0, 1, 11, 12]) {
   const opts = numOptions(answer, 0, 12);
   assert.equal(opts.length, 3);
@@ -104,60 +104,7 @@ const assertQuestionBase = (q) => {
   assert.ok(typeof q.emoji === 'string' && q.emoji.length >= 1, 'emoji');
 };
 
-// ---------- 1. 数一数 ----------
-for (let i = 0; i < ROUNDS; i += 1) {
-  const q = ctx.API.genCount();
-  assertQuestionBase(q);
-  assert.equal(q.type, 'objects');
-  assert.equal(q.tapCount, true);
-  assert.equal(q.groups.length, 1);
-  const n = q.groups[0].count;
-  assert.ok(n >= 3 && n <= 10, 'count range');
-  assert.equal(q.answer, n);
-  assert.equal(q.options.length, 3);
-  assert.ok(q.options.includes(n));
-}
-
-// ---------- 2. 认数字（双向） ----------
-{
-  let sawObjects = false;
-  let sawGroupPick = false;
-  for (let i = 0; i < ROUNDS; i += 1) {
-    const q = ctx.API.genNumber();
-    assertQuestionBase(q);
-    if (q.type === 'objects') {
-      sawObjects = true;
-      const n = q.groups[0].count;
-      assert.ok(n >= 1 && n <= 10, 'number range');
-      assert.equal(q.answer, n);
-      assert.ok(q.options.includes(n));
-    } else {
-      sawGroupPick = true;
-      assert.equal(q.type, 'groupPick');
-      assert.ok(q.digit >= 1 && q.digit <= 9, 'digit range');
-      assert.equal(q.groups.length, 3, 'three groups');
-      const counts = q.groups.map((g) => g.count);
-      assert.equal(new Set(counts).size, 3, 'groups distinct');
-      counts.forEach((c) => assert.ok(c >= 1 && c <= 10, 'group count range'));
-      assert.equal(counts[q.answer], q.digit, 'answer points to matching group');
-    }
-  }
-  assert.ok(sawObjects && sawGroupPick, '认数字两个方向都应出现');
-}
-
-// ---------- 3. 比多少 ----------
-for (let i = 0; i < ROUNDS; i += 1) {
-  const q = ctx.API.genMore();
-  assertQuestionBase(q);
-  assert.equal(q.type, 'compare');
-  assert.equal(q.groups.length, 2);
-  const [l, r] = q.groups.map((g) => g.count);
-  assert.ok(l >= 1 && l <= 9 && r >= 1 && r <= 9, 'compare range');
-  assert.notEqual(l, r, 'two sides must differ');
-  assert.equal(q.answer, l > r ? 0 : 1, 'answer points to bigger side');
-}
-
-// ---------- 4. 5 以内加法 ----------
+// ---------- 1. 5 以内加法 ----------
 for (let i = 0; i < ROUNDS; i += 1) {
   const q = ctx.API.genAdd5();
   assertQuestionBase(q);
@@ -170,60 +117,67 @@ for (let i = 0; i < ROUNDS; i += 1) {
   assert.ok(q.options.includes(a + b));
 }
 
-// ---------- 5. 5 以内减法 ----------
+// ---------- 2. 5 以内减法（喂小吃货） ----------
 for (let i = 0; i < ROUNDS; i += 1) {
   const q = ctx.API.genSub5();
   assertQuestionBase(q);
-  assert.equal(q.type, 'objects');
-  const total = q.groups[0].count;
-  const eaten = q.groups[0].eaten;
-  assert.ok(total >= 2 && total <= 5, 'sub5 total range');
-  assert.ok(eaten >= 1 && eaten <= total, 'sub5 eaten range');
-  assert.equal(q.answer, total - eaten);
-  assert.ok(q.answer >= 0, 'sub5 answer >= 0');
-  assert.ok(q.options.includes(total - eaten));
+  assert.equal(q.type, 'feed');
+  assert.ok(q.total >= 3 && q.total <= 5, 'sub5 total range');
+  assert.ok(q.toEat >= 1 && q.toEat <= q.total, 'sub5 toEat range');
+  assert.equal(q.answer, q.total - q.toEat);
+  assert.ok(q.answer >= 0, 'sub5 answer >= 0（含吃光剩 0）');
+  assert.ok(q.options.includes(q.answer));
+  // 题面必须写明要吃几个（语音与文字一致）
+  assert.ok(q.prompt.includes(String(q.toEat)), 'sub5 prompt mentions toEat');
 }
 
-// ---------- 6. 10 以内混合 ----------
-for (let i = 0; i < ROUNDS; i += 1) {
-  const q = ctx.API.genMix10();
-  assertQuestionBase(q);
-  assert.equal(q.type, 'objects');
-  if (q.plus) {
-    const [a, b] = q.groups.map((g) => g.count);
-    assert.ok(a >= 2 && b >= 1, 'mix10 add operands');
-    assert.ok(a + b <= 10, 'mix10 sum <= 10');
-    assert.equal(q.answer, a + b);
-  } else {
-    const total = q.groups[0].count;
-    const eaten = q.groups[0].eaten;
-    assert.ok(total >= 5 && total <= 10, 'mix10 sub total range');
-    assert.ok(eaten >= 1 && eaten <= total - 1, 'mix10 eaten range');
-    assert.equal(q.answer, total - eaten);
-    assert.ok(q.answer >= 1, 'mix10 sub answer >= 1');
+// ---------- 3. 10 以内混合 ----------
+{
+  let sawAdd = false;
+  let sawFeed = false;
+  for (let i = 0; i < ROUNDS; i += 1) {
+    const q = ctx.API.genMix10();
+    assertQuestionBase(q);
+    if (q.type === 'objects') {
+      sawAdd = true;
+      const [a, b] = q.groups.map((g) => g.count);
+      assert.ok(a >= 2 && b >= 1, 'mix10 add operands');
+      assert.ok(a + b <= 10, 'mix10 sum <= 10');
+      assert.equal(q.answer, a + b);
+    } else {
+      sawFeed = true;
+      assert.equal(q.type, 'feed');
+      assert.ok(q.total >= 5 && q.total <= 10, 'mix10 sub total range');
+      assert.ok(q.toEat >= 1 && q.toEat <= q.total - 1, 'mix10 toEat range');
+      assert.equal(q.answer, q.total - q.toEat);
+      assert.ok(q.answer >= 1, 'mix10 sub answer >= 1');
+    }
+    assert.ok(q.options.includes(q.answer));
   }
-  assert.ok(q.options.includes(q.answer));
+  assert.ok(sawAdd && sawFeed, '大冒险加减两种题型都应出现');
 }
 
 // ---------- 存档校验（防篡改：必须从头连续玩过） ----------
 eq(normalizeKidsStars(null), {});
 eq(normalizeKidsStars('x'), {});
 eq(normalizeKidsStars([]), {});
-eq(normalizeKidsStars({ count: 1 }), { count: 1 });
-eq(normalizeKidsStars({ count: 3, number: 2 }), { count: 3, number: 2 });
-eq(normalizeKidsStars({ number: 2 }), {});                       // 跳过第一个活动
-eq(normalizeKidsStars({ count: 1, more: 3 }), { count: 1 });      // 中间断档
-eq(normalizeKidsStars({ unknown: 3, count: 1 }), { count: 1 });   // 未知 id 丢弃
-eq(normalizeKidsStars({ count: 0 }), {});
-eq(normalizeKidsStars({ count: 4 }), {});
-eq(normalizeKidsStars({ count: 2.6 }), { count: 2 });
-eq(normalizeKidsStars({ count: '3', number: '1' }), { count: 3, number: 1 });
+eq(normalizeKidsStars({ add5: 1 }), { add5: 1 });
+eq(normalizeKidsStars({ add5: 3, sub5: 2 }), { add5: 3, sub5: 2 });
+eq(normalizeKidsStars({ sub5: 2 }), {});                        // 跳过第一个活动
+eq(normalizeKidsStars({ add5: 1, mix10: 3 }), { add5: 1 });      // 中间断档
+eq(normalizeKidsStars({ unknown: 3, add5: 1 }), { add5: 1 });    // 未知 id 丢弃
+eq(normalizeKidsStars({ count: 2, number: 3, add5: 1 }), { add5: 1 });   // 旧版存档：已移除的 id 被丢弃
+eq(normalizeKidsStars({ count: 3, number: 3, more: 3, add5: 2, sub5: 1 }), { add5: 2, sub5: 1 });
+eq(normalizeKidsStars({ add5: 0 }), {});
+eq(normalizeKidsStars({ add5: 4 }), {});
+eq(normalizeKidsStars({ add5: 2.6 }), { add5: 2 });
+eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 
 // ---------- 结构性守卫 ----------
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v7'/);
+assert.match(sw, /const CACHE = 'sxd-v8'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);
@@ -238,5 +192,9 @@ assert.match(kids, /function speak\(/);
 assert.match(kids, /speechSynthesis/);
 assert.doesNotMatch(kids, /setInterval/);          // 没有任何倒计时/计时器
 assert.match(kids, /'sxd_kids_stars'/);
+// 喂小吃货交互的必要结构
+assert.match(kids, /MONSTER_SVG/);
+assert.match(kids, /appetite/);
+assert.match(kids, /classList\.add\('eaten'\)/);
 
 console.log('kids.test.mjs: all checks passed');

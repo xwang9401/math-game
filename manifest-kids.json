@@ -1,7 +1,7 @@
 {
   "name": "数数小达人 · 幼儿数学启蒙",
   "short_name": "数数小达人",
-  "description": "给中班小朋友的数学启蒙：数一数、认数字、比多少、5 以内加减法。",
+  "description": "给中班小朋友的数学启蒙：实物图加减法，喂小吃货理解减法。",
   "lang": "zh-CN",
   "start_url": "./kids.html",
   "scope": "./",

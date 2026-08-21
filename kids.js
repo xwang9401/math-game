@@ -6,7 +6,9 @@
  *   - 不依赖识字：题目用实物图案展示，语音读题（speechSynthesis）
  *   - 不用键盘输入：答案为 3 个大泡泡点选，或直接点选图案
  *   - 零压力：没有怪兽、没有倒计时，答错轻轻提示后无限重试
- *   - 六个活动按序解锁：数一数 → 认数字 → 比多少 → 小加法 → 小减法 → 大冒险
+ *   - 减法做成「喂小吃货」：亲手点掉要吃的实物（留下虚线幽灵位），
+ *     剩下的就是答案——减法 = 拿走，看得见摸得着
+ *   - 三个活动按序解锁：小加法 → 小减法 → 大冒险（10 以内混合）
  * ============================================================ */
 (function () {
   'use strict';
@@ -46,10 +48,10 @@
   }
 
   const EMOJIS = ['🍎', '🍓', '🐥', '🦋', '⭐', '🌸', '🐞', '🐟', '🍇', '🎈'];
-  const PRAISE = ['真棒！', '太厉害啦！', '答对咯！', '好样的！', '哇，你好聪明！'];
   const PRAISE_SPEECH = ['真棒！', '太厉害啦', '答对咯', '好样的'];
 
-  /* ---------------- 小星公主（雪儿公主的妹妹，原创形象） ---------------- */
+  /* ---------------- 角色 SVG ---------------- */
+  // 小星公主（雪儿公主的妹妹，原创形象）
   const KID_SVG =
     '<svg viewBox="0 0 60 72" xmlns="http://www.w3.org/2000/svg">' +
     '<circle cx="11" cy="24" r="5" fill="#8a5a3b"/><circle cx="49" cy="24" r="5" fill="#8a5a3b"/>' +
@@ -63,6 +65,19 @@
     '<circle cx="26" cy="20" r="1.5" fill="#3a3a3a"/><circle cx="34" cy="20" r="1.5" fill="#3a3a3a"/>' +
     '<circle cx="22.5" cy="24" r="2" fill="#ffb3ba" opacity="0.8"/><circle cx="37.5" cy="24" r="2" fill="#ffb3ba" opacity="0.8"/>' +
     '<path d="M26 26 Q30 29.5 34 26" stroke="#3a3a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+    '</svg>';
+
+  // 小吃货：张着大嘴的圆滚滚小怪物，喂它就咬一口
+  const MONSTER_SVG =
+    '<svg viewBox="0 0 56 50" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M16 12 L12 3 L21 7 Z" fill="#e87f95"/>' +
+    '<path d="M40 12 L44 3 L35 7 Z" fill="#e87f95"/>' +
+    '<ellipse cx="28" cy="29" rx="20" ry="19" fill="#ffb3ba"/>' +
+    '<circle cx="20" cy="18" r="5" fill="#fff"/><circle cx="36" cy="18" r="5" fill="#fff"/>' +
+    '<circle cx="21" cy="19" r="2.2" fill="#3a3a3a"/><circle cx="35" cy="19" r="2.2" fill="#3a3a3a"/>' +
+    '<ellipse cx="28" cy="33" rx="10" ry="7.5" fill="#7a2e3e"/>' +
+    '<path d="M21 30.5 Q28 27 35 30.5 L35 32.5 Q28 29.5 21 32.5 Z" fill="#fff"/>' +
+    '<ellipse cx="28" cy="37" rx="5" ry="2.6" fill="#ff7d8e"/>' +
     '</svg>';
 
   /* ---------------- 音效（Web Audio 合成，柔和不刺耳） ---------------- */
@@ -109,6 +124,8 @@
   };
   // 答错：温柔的低音，不是刺耳的「错误」声
   const playOops = () => { ensureAudio(); tone(330, 0, 0.2, 'sine', 0.12); };
+  // 喂一口：「啊呜」两声短音
+  const playNom = () => { ensureAudio(); tone(392, 0, 0.07, 'triangle', 0.2); tone(262, 0.07, 0.12, 'triangle', 0.2); };
   const playStars = (n) => {
     ensureAudio();
     for (let i = 0; i < Math.max(1, n); i += 1) tone(523 + i * 131, i * 0.18, 0.25, 'sine', 0.22);
@@ -142,65 +159,6 @@
     return shuffle(set);
   }
 
-  function genCount() {
-    const n = randInt(3, 10);
-    return {
-      type: 'objects',
-      prompt: '数一数，一共有几个？',
-      speech: '数一数，一共有几个',
-      emoji: pick(EMOJIS),
-      groups: [{ count: n, eaten: 0 }],
-      plus: false,
-      tapCount: true,
-      answer: n,
-      options: numOptions(n, 0, 12),
-    };
-  }
-
-  function genNumber() {
-    if (Math.random() < 0.5) {
-      // 看实物 → 选数字
-      const n = randInt(1, 10);
-      return {
-        type: 'objects',
-        prompt: '有几个？点出数字',
-        speech: '有几个？点出数字',
-        emoji: pick(EMOJIS),
-        groups: [{ count: n, eaten: 0 }],
-        tapCount: false,
-        answer: n,
-        options: numOptions(n, 0, 12),
-      };
-    }
-    // 看数字 → 找出一样多的一堆
-    const n = randInt(1, 9);
-    const others = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((v) => v !== n)).slice(0, 2);
-    const counts = shuffle([n, others[0], others[1]]);
-    return {
-      type: 'groupPick',
-      prompt: '和数字一样多的是哪一堆？',
-      speech: '和它一样多的是哪一堆',
-      emoji: pick(EMOJIS),
-      digit: n,
-      groups: counts.map((c) => ({ count: c })),
-      answer: counts.indexOf(n),
-    };
-  }
-
-  function genMore() {
-    const left = randInt(1, 9);
-    let right = randInt(1, 9);
-    while (right === left) right = randInt(1, 9);
-    return {
-      type: 'compare',
-      prompt: '哪一边的多？',
-      speech: '哪一边的多',
-      emoji: pick(EMOJIS),
-      groups: [{ count: left }, { count: right }],
-      answer: left > right ? 0 : 1,
-    };
-  }
-
   function genAdd5() {
     const a = randInt(1, 4);
     const b = randInt(1, 5 - a);
@@ -209,26 +167,25 @@
       prompt: '合起来一共有几个？',
       speech: '合起来，一共有几个',
       emoji: pick(EMOJIS),
-      groups: [{ count: a, eaten: 0 }, { count: b, eaten: 0 }],
+      groups: [{ count: a }, { count: b }],
       plus: true,
-      tapCount: false,
       answer: a + b,
       options: numOptions(a + b, 0, 8),
     };
   }
 
+  // 小减法：先亲手喂掉 toEat 个（留下幽灵空位），剩下的就是答案
   function genSub5() {
-    const total = randInt(2, 5);
-    const eaten = randInt(1, total);
+    const total = randInt(3, 5);
+    const toEat = randInt(1, total);
     return {
-      type: 'objects',
-      prompt: '吃掉了一些，还剩几个？',
-      speech: '吃掉了一些，还剩几个',
+      type: 'feed',
+      prompt: '喂小吃货吃掉 ' + toEat + ' 个，还剩几个？',
+      speech: '先点 ' + toEat + ' 个喂给小吃货，再看看还剩几个',
       emoji: pick(EMOJIS),
-      groups: [{ count: total, eaten }],
-      tapCount: false,
-      answer: total - eaten,
-      options: numOptions(total - eaten, 0, 8),
+      total, toEat,
+      answer: total - toEat,
+      options: numOptions(total - toEat, 0, 8),
     };
   }
 
@@ -241,34 +198,29 @@
         prompt: '合起来一共有几个？',
         speech: '合起来，一共有几个',
         emoji: pick(EMOJIS),
-        groups: [{ count: a, eaten: 0 }, { count: b, eaten: 0 }],
+        groups: [{ count: a }, { count: b }],
         plus: true,
-        tapCount: false,
         answer: a + b,
         options: numOptions(a + b, 0, 12),
       };
     }
     const total = randInt(5, 10);
-    const eaten = randInt(1, total - 1);
+    const toEat = randInt(1, total - 1);
     return {
-      type: 'objects',
-      prompt: '吃掉了一些，还剩几个？',
-      speech: '吃掉了一些，还剩几个',
+      type: 'feed',
+      prompt: '喂小吃货吃掉 ' + toEat + ' 个，还剩几个？',
+      speech: '先点 ' + toEat + ' 个喂给小吃货，再看看还剩几个',
       emoji: pick(EMOJIS),
-      groups: [{ count: total, eaten }],
-      tapCount: false,
-      answer: total - eaten,
-      options: numOptions(total - eaten, 0, 12),
+      total, toEat,
+      answer: total - toEat,
+      options: numOptions(total - toEat, 0, 12),
     };
   }
 
   /* ---------------- 活动清单（按顺序解锁） ---------------- */
   const ACTS = [
-    { id: 'count', name: '数一数', emoji: '🍎', tip: '点一个，数一个', gen: genCount },
-    { id: 'number', name: '认数字', emoji: '🔢', tip: '找出一样多的', gen: genNumber },
-    { id: 'more', name: '比多少', emoji: '⚖️', tip: '哪一边的多', gen: genMore },
     { id: 'add5', name: '小加法', emoji: '➕', tip: '合起来有几个', gen: genAdd5 },
-    { id: 'sub5', name: '小减法', emoji: '➖', tip: '吃掉还剩几个', gen: genSub5 },
+    { id: 'sub5', name: '小减法', emoji: '😋', tip: '喂饱小吃货', gen: genSub5 },
     { id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10 },
   ];
 
@@ -367,54 +319,25 @@
     }
   }
 
-  // 一堆实物图案（可点选数数 / 标记被吃掉的）
-  function buildGroup(group, q) {
+  // 一堆实物图案；interactive 时可点击（喂小吃货），onTap 收到被点的元素
+  function buildObjects(count, emoji, interactive, onTap) {
     const wrap = document.createElement('div');
     wrap.className = 'obj-group';
-    let counted = 0;
-    for (let i = 0; i < group.count; i += 1) {
-      const isEaten = q.groups[0] === group && group.eaten > 0 && i < group.eaten;
-      const obj = document.createElement('button');
-      obj.type = 'button';
-      obj.className = 'obj' + (isEaten ? ' eaten' : '');
-      obj.setAttribute('aria-label', isEaten ? '被吃掉的' : '点一点，数一数');
+    for (let i = 0; i < count; i += 1) {
+      const obj = interactive ? document.createElement('button') : document.createElement('span');
+      if (interactive) {
+        obj.type = 'button';
+        obj.setAttribute('aria-label', '点一点，喂给小吃货');
+      }
+      obj.className = 'obj';
       const pic = document.createElement('span');
       pic.className = 'obj-pic';
-      pic.textContent = q.emoji;
+      pic.textContent = emoji;
       obj.appendChild(pic);
-      if (isEaten) {
-        const mark = document.createElement('span');
-        mark.className = 'obj-mark';
-        mark.textContent = '😋';
-        obj.appendChild(mark);
-        obj.disabled = true;
-      } else if (q.tapCount) {
-        const badge = document.createElement('span');
-        badge.className = 'obj-badge';
-        obj.appendChild(badge);
-        obj.addEventListener('click', () => {
-          if (obj.classList.contains('counted')) return;
-          counted += 1;
-          obj.classList.add('counted');
-          badge.textContent = String(counted);
-          playClick();
-          speak(String(counted));
-        });
-      }
+      if (interactive) obj.addEventListener('click', () => onTap(obj));
       wrap.appendChild(obj);
     }
     return wrap;
-  }
-
-  function buildGroupCard(count, emoji, small) {
-    const card = document.createElement('div');
-    card.className = 'group-card' + (small ? ' small' : '');
-    for (let i = 0; i < count; i += 1) {
-      const s = document.createElement('span');
-      s.textContent = emoji;
-      card.appendChild(s);
-    }
-    return card;
   }
 
   function renderQuestion() {
@@ -431,16 +354,15 @@
     choices.textContent = '';
 
     if (q.type === 'objects') {
+      // 加法：两堆实物中间一个大加号
       const row = document.createElement('div');
       row.className = 'obj-row';
-      row.appendChild(buildGroup(q.groups[0], q));
-      if (q.plus) {
-        const plus = document.createElement('span');
-        plus.className = 'k-plus';
-        plus.textContent = '+';
-        row.appendChild(plus);
-        row.appendChild(buildGroup(q.groups[1], q));
-      }
+      row.appendChild(buildObjects(q.groups[0].count, q.emoji, false));
+      const plus = document.createElement('span');
+      plus.className = 'k-plus';
+      plus.textContent = '+';
+      row.appendChild(plus);
+      row.appendChild(buildObjects(q.groups[1].count, q.emoji, false));
       stage.appendChild(row);
       q.options.forEach((v) => {
         const b = document.createElement('button');
@@ -450,28 +372,57 @@
         b.addEventListener('click', () => chooseNumber(b, v));
         choices.appendChild(b);
       });
-    } else if (q.type === 'groupPick') {
-      const digitCard = document.createElement('div');
-      digitCard.className = 'digit-card';
-      digitCard.textContent = String(q.digit);
-      stage.appendChild(digitCard);
-      q.groups.forEach((g, idx) => {
+    } else if (q.type === 'feed') {
+      // 减法：点 toEat 个喂给小吃货（留下虚线幽灵位），剩下几个就是答案
+      const row = document.createElement('div');
+      row.className = 'obj-row';
+      const panel = document.createElement('div');
+      panel.className = 'feed-panel';
+      const monster = document.createElement('div');
+      monster.className = 'feed-monster';
+      monster.innerHTML = MONSTER_SVG;
+      const appetite = document.createElement('div');
+      appetite.className = 'appetite';
+      appetite.setAttribute('aria-label', '还要喂几个');
+      for (let i = 0; i < q.toEat; i += 1) {
+        const dot = document.createElement('span');
+        dot.className = 'appetite-dot';
+        appetite.appendChild(dot);
+      }
+      panel.append(monster, appetite);
+
+      let fed = 0;
+      row.appendChild(buildObjects(q.total, q.emoji, true, (obj) => {
+        if (obj.classList.contains('eaten')) return;
+        if (fed >= q.toEat) {
+          speak('小吃货吃饱啦，看看还剩几个？');
+          return;
+        }
+        fed += 1;
+        obj.classList.add('eaten');
+        obj.disabled = true;
+        appetite.children[fed - 1].classList.add('filled');
+        monster.classList.remove('chomp');
+        void monster.offsetWidth;
+        monster.classList.add('chomp');
+        playNom();
+        speak(String(fed));
+        if (fed === q.toEat) {
+          const seq = state.runSeq;
+          setTimeout(() => {
+            if (state.screen === 'game' && state.runSeq === seq) speak('还剩几个？');
+          }, 900);
+        }
+      }));
+      row.appendChild(panel);
+      stage.appendChild(row);
+      q.options.forEach((v) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'group-choice';
-        const inner = buildGroupCard(g.count, q.emoji, true);
-        b.appendChild(inner);
-        b.addEventListener('click', () => chooseElement(b, idx));
+        b.className = 'bubble';
+        b.textContent = String(v);
+        b.addEventListener('click', () => chooseNumber(b, v));
         choices.appendChild(b);
-      });
-    } else if (q.type === 'compare') {
-      q.groups.forEach((g, idx) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'group-choice big';
-        b.appendChild(buildGroupCard(g.count, q.emoji, false));
-        b.addEventListener('click', () => chooseElement(b, idx));
-        stage.appendChild(b);
       });
     }
 
@@ -483,12 +434,6 @@
   function chooseNumber(btn, value) {
     if (state.locked) return;
     if (value === state.question.answer) acceptAnswer(btn);
-    else rejectAnswer(btn);
-  }
-
-  function chooseElement(btn, idx) {
-    if (state.locked) return;
-    if (idx === state.question.answer) acceptAnswer(btn);
     else rejectAnswer(btn);
   }
 
