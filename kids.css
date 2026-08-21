@@ -408,6 +408,34 @@ h2 {
   75% { transform: translateX(8px); }
 }
 
+/* 十格盘（凑十）：2×5 格，装了的显示实物，空格虚线 */
+.ten-frame {
+  display: grid;
+  grid-template-columns: repeat(5, 56px);
+  gap: 8px;
+  background: #fff;
+  padding: 14px;
+  border-radius: 18px;
+  box-shadow: 0 4px 14px rgba(214, 96, 157, 0.14);
+}
+.ten-cell {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  line-height: 1;
+  border-radius: 12px;
+  background: #fff7fa;
+  border: 2.5px solid #ffd0e4;
+  animation: objIn 0.3s ease backwards;
+}
+.ten-cell.empty {
+  border: 2.5px dashed #e4cdd6;
+  background: transparent;
+}
+
 /* ---------- 结果页 ---------- */
 .k-stars {
   display: flex;
@@ -495,6 +523,8 @@ h2 {
   .obj-pic { font-size: 34px; }
   .bubble { width: 82px; height: 82px; font-size: 38px; }
   .feed-monster { width: 52px; }
+  .ten-frame { grid-template-columns: repeat(5, 48px); gap: 6px; padding: 10px; }
+  .ten-cell { width: 48px; height: 48px; font-size: 28px; border-radius: 10px; }
   .act-card { padding: 14px 8px 12px; }
   .act-emoji { font-size: 36px; }
   .k-star { font-size: 50px; }

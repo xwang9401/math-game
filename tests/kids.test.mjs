@@ -44,7 +44,7 @@ function extractConstArray(source, name) {
 }
 
 // 在 vm 中运行 kids.js 里真实的出题器 / 活动清单 / 存档校验
-const GEN_NAMES = ['genAdd5', 'genSub5', 'genMix10'];
+const GEN_NAMES = ['genAdd5', 'genSub5', 'genMake10', 'genMix10'];
 const apiSource = `
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -70,9 +70,9 @@ const { ACTS, normalizeKidsStars, numOptions } = ctx.API;
 const eq = (actual, expected, msg) =>
   assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected), msg);
 
-// ---------- 活动清单结构（三个活动，入门三项已移除） ----------
-assert.equal(ACTS.length, 3);
-eq(ACTS.map((a) => a.id), ['add5', 'sub5', 'mix10']);
+// ---------- 活动清单结构（四个活动，按难度递增） ----------
+assert.equal(ACTS.length, 4);
+eq(ACTS.map((a) => a.id), ['add5', 'sub5', 'make10', 'mix10']);
 for (const act of ACTS) {
   assert.ok(typeof act.name === 'string' && act.name.length >= 2 && act.name.length <= 6, act.id);
   assert.ok(typeof act.tip === 'string' && act.tip.length >= 3, act.id + ' tip');
@@ -101,7 +101,9 @@ const ROUNDS = 3000;
 const assertQuestionBase = (q) => {
   assert.ok(typeof q.prompt === 'string' && q.prompt.length >= 3, 'prompt');
   assert.ok(typeof q.speech === 'string' && q.speech.length >= 2, 'speech');
-  assert.ok(typeof q.emoji === 'string' && q.emoji.length >= 1, 'emoji');
+  const hasEmoji = typeof q.emoji === 'string'
+    || (Array.isArray(q.fill) && q.fill.every((g) => typeof g.emoji === 'string' && g.emoji.length >= 1));
+  assert.ok(hasEmoji, 'emoji');
 };
 
 // ---------- 1. 5 以内加法 ----------
@@ -131,7 +133,35 @@ for (let i = 0; i < ROUNDS; i += 1) {
   assert.ok(q.prompt.includes(String(q.toEat)), 'sub5 prompt mentions toEat');
 }
 
-// ---------- 3. 10 以内混合 ----------
+// ---------- 3. 凑十（十格盘：装满盘 / 还差几个） ----------
+{
+  let sawFull = false;
+  let sawMissing = false;
+  for (let i = 0; i < ROUNDS; i += 1) {
+    const q = ctx.API.genMake10();
+    assertQuestionBase(q);
+    assert.equal(q.type, 'tenframe');
+    assert.ok(q.fill.length >= 1 && q.fill.length <= 2, 'fill groups');
+    const total = q.fill.reduce((s, g) => s + g.count, 0);
+    q.fill.forEach((g) => assert.ok(g.count >= 1 && g.count <= 9, 'fill count range'));
+    if (q.fill.length === 2) {
+      sawFull = true;
+      assert.equal(total, 10, '装满盘：两组正好 10');
+      assert.notEqual(q.fill[0].emoji, q.fill[1].emoji, '两种实物代表两个加数');
+      assert.equal(q.answer, 10);
+    } else {
+      sawMissing = true;
+      assert.ok(total >= 1 && total <= 9, '还差几个：已装 1~9 个');
+      assert.equal(q.answer, 10 - total);
+      assert.ok(q.answer >= 1 && q.answer <= 9, '补数在 1~9');
+    }
+    assert.ok(q.options.includes(q.answer));
+    assert.equal(new Set(q.options).size, 3);
+  }
+  assert.ok(sawFull && sawMissing, '凑十两种题型都应出现');
+}
+
+// ---------- 4. 10 以内混合 ----------
 {
   let sawAdd = false;
   let sawFeed = false;
@@ -177,7 +207,7 @@ eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v8'/);
+assert.match(sw, /const CACHE = 'sxd-v9'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);

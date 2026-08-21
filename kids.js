@@ -189,6 +189,32 @@
     };
   }
 
+  // 凑十：十格盘（幼儿园标准教具，2×5 格子）让「合起来是 10」看得见
+  function genMake10() {
+    const a = randInt(1, 9);
+    if (Math.random() < 0.45) {
+      // 装满盘：a 个 + b 个 正好 10（3+7、2+8 这种好朋友加法）
+      const emojis = shuffle(EMOJIS).slice(0, 2);
+      return {
+        type: 'tenframe',
+        prompt: '盘子里一共有几个？',
+        speech: '两种好吃的合起来，一共有几个',
+        fill: [{ count: a, emoji: emojis[0] }, { count: 10 - a, emoji: emojis[1] }],
+        answer: 10,
+        options: numOptions(10, 0, 12),
+      };
+    }
+    // 还差几个能装满：补数训练（3 的好朋友是 7），空格就在盘子里，数得着
+    return {
+      type: 'tenframe',
+      prompt: '还差几个能装满盘子？',
+      speech: '还差几个，能装满这个十格盘',
+      fill: [{ count: a, emoji: pick(EMOJIS) }],
+      answer: 10 - a,
+      options: numOptions(10 - a, 0, 12),
+    };
+  }
+
   function genMix10() {
     if (Math.random() < 0.5) {
       const a = randInt(2, 9);
@@ -221,6 +247,7 @@
   const ACTS = [
     { id: 'add5', name: '小加法', emoji: '➕', tip: '合起来有几个', gen: genAdd5 },
     { id: 'sub5', name: '小减法', emoji: '😋', tip: '喂饱小吃货', gen: genSub5 },
+    { id: 'make10', name: '凑十', emoji: '🔟', tip: '装满十格盘', gen: genMake10 },
     { id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10 },
   ];
 
@@ -340,6 +367,38 @@
     return wrap;
   }
 
+  // 十格盘：2×5 共 10 格，装了的显示实物，没装的显示虚线空格
+  function buildTenFrame(q) {
+    const frame = document.createElement('div');
+    frame.className = 'ten-frame';
+    frame.setAttribute('aria-label', '十格盘');
+    const items = [];
+    q.fill.forEach((g) => {
+      for (let i = 0; i < g.count; i += 1) items.push(g.emoji);
+    });
+    for (let i = 0; i < 10; i += 1) {
+      const cell = document.createElement('span');
+      cell.className = 'ten-cell' + (i < items.length ? '' : ' empty');
+      cell.textContent = items[i] || '';
+      cell.style.animationDelay = (i * 0.05) + 's';
+      frame.appendChild(cell);
+    }
+    return frame;
+  }
+
+  function buildNumberChoices(q) {
+    const choices = $('#kChoices');
+    choices.textContent = '';
+    q.options.forEach((v) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bubble';
+      b.textContent = String(v);
+      b.addEventListener('click', () => chooseNumber(b, v));
+      choices.appendChild(b);
+    });
+  }
+
   function renderQuestion() {
     const act = ACTS[state.act.idx];
     const q = act.gen();
@@ -350,8 +409,7 @@
     $('#kPrompt').textContent = q.prompt;
     const stage = $('#kStage');
     stage.textContent = '';
-    const choices = $('#kChoices');
-    choices.textContent = '';
+    $('#kChoices').textContent = '';
 
     if (q.type === 'objects') {
       // 加法：两堆实物中间一个大加号
@@ -364,14 +422,6 @@
       row.appendChild(plus);
       row.appendChild(buildObjects(q.groups[1].count, q.emoji, false));
       stage.appendChild(row);
-      q.options.forEach((v) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'bubble';
-        b.textContent = String(v);
-        b.addEventListener('click', () => chooseNumber(b, v));
-        choices.appendChild(b);
-      });
     } else if (q.type === 'feed') {
       // 减法：点 toEat 个喂给小吃货（留下虚线幽灵位），剩下几个就是答案
       const row = document.createElement('div');
@@ -416,16 +466,12 @@
       }));
       row.appendChild(panel);
       stage.appendChild(row);
-      q.options.forEach((v) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'bubble';
-        b.textContent = String(v);
-        b.addEventListener('click', () => chooseNumber(b, v));
-        choices.appendChild(b);
-      });
+    } else if (q.type === 'tenframe') {
+      // 凑十：十格盘（装满盘 / 还差几个）
+      stage.appendChild(buildTenFrame(q));
     }
 
+    buildNumberChoices(q);
     renderProgress();
     speak(q.speech);
   }
