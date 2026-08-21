@@ -556,13 +556,19 @@
       if (state.mode === 'scroll' && state.scroll && state.scroll.awaitSkip) {
         state.scroll.awaitSkip = false;
         clearNextTimer();
-        nextQuestion();
+        if (state.scroll.qIndex >= scrollRunTotal()) endScrollRun();
+        else nextQuestion();
       }
       return;
     }
-    if (state.mode === 'scroll') stopScrollQTimer();
     if (state.mode === 'challenge' && Date.now() >= state.deadline) {
       endChallenge();
+      return;
+    }
+    if (state.mode === 'scroll' && state.scroll && state.scroll.kind === 'test'
+      && Date.now() >= state.scroll.qDeadline) {
+      stopScrollQTimer();
+      onScrollTimeout();
       return;
     }
     const q = state.question;
@@ -581,6 +587,7 @@
       return;
     }
 
+    if (state.mode === 'scroll') stopScrollQTimer();
     const v1 = parseInt(box1.value, 10);
     let ok;
     if (q.isDiv) {
@@ -1288,8 +1295,8 @@
       return {
         text: a + ' + ' + b, answer: a + b,
         hint: ['把 ' + a + ' 看成 ' + base, base + ' + ' + b + ' = ' + mid,
-          (low ? '少算了 ' : '多算了 ') + d + '，' + (low ? '补上' : '减去')
-            + '：' + mid + (low ? ' + ' : ' − ') + d + ' = ' + (a + b)],
+          (low ? '多算了 ' : '少算了 ') + d + '，' + (low ? '减去' : '补上')
+            + '：' + mid + (low ? ' − ' : ' + ') + d + ' = ' + (a + b)],
       };
     }
     // 减法：减数接近整百

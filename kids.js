@@ -400,6 +400,13 @@
     return frame;
   }
 
+  function setNumberChoicesEnabled(enabled) {
+    $$('#kChoices .bubble').forEach((button) => {
+      button.disabled = !enabled;
+      button.setAttribute('aria-disabled', String(!enabled));
+    });
+  }
+
   function buildNumberChoices(q) {
     const choices = $('#kChoices');
     choices.textContent = '';
@@ -411,11 +418,13 @@
       b.addEventListener('click', () => chooseNumber(b, v));
       choices.appendChild(b);
     });
+    setNumberChoicesEnabled(q.type !== 'feed' || q.feedComplete);
   }
 
   function renderQuestion(afterIntro) {
     const act = ACTS[state.act.idx];
     const q = act.gen();
+    q.feedComplete = q.type !== 'feed';
     state.question = q;
     state.locked = false;
     state.act.retries = 0;
@@ -473,6 +482,8 @@
         playNom();
         speak(String(fed));
         if (fed === q.toEat) {
+          q.feedComplete = true;
+          setNumberChoicesEnabled(true);
           appetite.classList.add('done');   // 喂饱后停止脉动提醒
           const seq = state.runSeq;
           setTimeout(() => {
@@ -495,6 +506,10 @@
   /* ---------------- 作答 ---------------- */
   function chooseNumber(btn, value) {
     if (state.locked) return;
+    if (state.question.type === 'feed' && !state.question.feedComplete) {
+      speak('先喂饱小吃货哦');
+      return;
+    }
     if (value === state.question.answer) acceptAnswer(btn);
     else rejectAnswer(btn);
   }
