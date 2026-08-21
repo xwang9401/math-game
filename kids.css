@@ -478,6 +478,55 @@ h2 {
 }
 .carry-pile { justify-content: center; }
 
+/* 分果果：两个餐盘 + 篮子 */
+.share-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.share-plates {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.share-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.share-char { width: 46px; }
+.share-char svg { width: 100%; display: block; }
+.share-plate {
+  min-height: 76px;
+  min-width: 132px;
+  border: 3px dashed #e4cdd6;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  justify-content: center;
+  align-content: center;
+}
+.share-fruit {
+  font-size: 30px;
+  line-height: 1.1;
+  animation: slotPop 0.35s ease;
+}
+.share-basket { justify-content: center; }
+/* 奇数剩下的最后一个：抖动 + 问号提示分不下去 */
+.obj.leftover {
+  border: 3px solid #f5a623;
+  animation: wiggle 0.9s ease-in-out infinite;
+}
+@keyframes wiggle {
+  25% { transform: rotate(-7deg); }
+  75% { transform: rotate(7deg); }
+}
+
 /* ---------- 结果页 ---------- */
 .k-stars {
   display: flex;
@@ -566,6 +615,9 @@ h2 {
   .bubble { width: 82px; height: 82px; font-size: 38px; }
   .feed-monster { width: 56px; }
   .appetite-slot { font-size: 26px; }
+  .share-plate { min-width: 108px; min-height: 64px; }
+  .share-fruit { font-size: 25px; }
+  .share-char { width: 38px; }
   .ten-frame { grid-template-columns: repeat(5, 48px); gap: 6px; padding: 10px; }
   .ten-cell { width: 48px; height: 48px; font-size: 28px; border-radius: 10px; }
   .act-card { padding: 14px 8px 12px; }

@@ -235,6 +235,25 @@
     };
   }
 
+  // 分果果：把 N 个果果平均分给两个人（你一个我一个），
+  // 奇数个时最后剩一个分不下去——单双数的直观体验
+  function genShare() {
+    const total = randInt(2, 10);
+    const odd = total % 2 === 1;
+    const askEach = Math.random() < 0.5;
+    return {
+      type: 'share',
+      prompt: askEach ? '平均分给两个人，每人分到几个？' : '平均分给两个人，还剩几个？',
+      speech: askEach ? '你一个，我一个，平均分一分，每人分到几个？' : '你一个，我一个，平均分一分，还剩几个？',
+      emoji: pick(EMOJIS),
+      total,
+      ask: askEach ? 'each' : 'left',
+      answer: askEach ? (total - (total % 2)) / 2 : total % 2,
+      options: askEach ? numOptions((total - (total % 2)) / 2, 0, 12) : numOptions(total % 2, 0, 2),
+      conclusion: odd ? '剩下一个，' + total + ' 是单数！' : '正好分完，' + total + ' 是双数！',
+    };
+  }
+
   function genMix10() {
     if (Math.random() < 0.5) {
       const a = randInt(2, 9);
@@ -276,6 +295,10 @@
     {
       id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10,
       speech: '大冒险！十以内的加法和减法，加油！',
+    },
+    {
+      id: 'share', name: '分果果', emoji: '🍒', tip: '你一个我一个', gen: genShare,
+      speech: '分果果！你一个，我一个，平均分给小星和小吃货！',
     },
     {
       id: 'make10', name: '凑十', emoji: '🔟', tip: '装满十格盘', gen: genMake10,
@@ -564,6 +587,74 @@
       }
       wrap.append(frame, pile);
       stage.appendChild(wrap);
+    } else if (q.type === 'share') {
+      // 分果果：小星和小吃货各一个盘子，点篮子里的果果轮流分（你一个我一个）
+      const wrap = document.createElement('div');
+      wrap.className = 'share-wrap';
+      const plates = document.createElement('div');
+      plates.className = 'share-plates';
+      const makeSide = (svg, label) => {
+        const side = document.createElement('div');
+        side.className = 'share-side';
+        const ch = document.createElement('div');
+        ch.className = 'share-char';
+        ch.innerHTML = svg;
+        const plate = document.createElement('div');
+        plate.className = 'share-plate';
+        plate.setAttribute('aria-label', label + '的盘子');
+        side.append(ch, plate);
+        return { side, plate };
+      };
+      const left = makeSide(KID_SVG, '小星');
+      const right = makeSide(MONSTER_SVG, '小吃货');
+      plates.append(left.side, right.side);
+
+      const basket = document.createElement('div');
+      basket.className = 'obj-group share-basket';
+      let placed = 0;
+      const maxPlace = q.total - (q.total % 2);
+      let leftoverSaid = false;
+      for (let i = 0; i < q.total; i += 1) {
+        const obj = document.createElement('button');
+        obj.type = 'button';
+        obj.className = 'obj';
+        obj.setAttribute('aria-label', '点一点，分果果');
+        const pic = document.createElement('span');
+        pic.className = 'obj-pic';
+        pic.textContent = q.emoji;
+        obj.appendChild(pic);
+        obj.addEventListener('click', () => {
+          if (obj.classList.contains('moved') || obj.classList.contains('leftover')) return;
+          if (placed >= maxPlace) {
+            // 奇数个的最后一个：再分就不一样多了，剩下来
+            obj.classList.add('leftover');
+            if (!leftoverSaid) {
+              leftoverSaid = true;
+              speak('分不了啦，一人一个才公平，这个剩下了！');
+            }
+            return;
+          }
+          placed += 1;
+          obj.classList.add('moved');
+          obj.disabled = true;
+          const toLeft = placed % 2 === 1;
+          const mini = document.createElement('span');
+          mini.className = 'share-fruit';
+          mini.textContent = q.emoji;
+          (toLeft ? left.plate : right.plate).appendChild(mini);
+          playMove();
+          speak(toLeft ? '给小星' : '给小吃货');
+          if (placed === maxPlace && q.total % 2 === 1) {
+            const seq = state.runSeq;
+            setTimeout(() => {
+              if (state.screen === 'game' && state.runSeq === seq) speak('剩下的分不了啦！还剩几个？');
+            }, 900);
+          }
+        });
+        basket.appendChild(obj);
+      }
+      wrap.append(plates, basket);
+      stage.appendChild(wrap);
     }
 
     buildNumberChoices(q);
@@ -583,6 +674,8 @@
     btn.classList.add('correct');
     playCorrect();
     speak(pick(PRAISE_SPEECH));
+    // 分果果：答对后顺势总结单双数（排队跟在表扬后面）
+    if (state.question.conclusion) speak(state.question.conclusion, true);
     confettiAt(btn);
     if (state.act.retries === 0) state.act.firstTry += 1;
     const seq = state.runSeq;
