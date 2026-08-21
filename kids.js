@@ -132,10 +132,11 @@
   };
 
   /* ---------------- 语音读题（不支持时自动静默） ---------------- */
-  function speak(text) {
+  // queue 为真时不打断正在播的语音，排在其后（用于「活动介绍 → 首题读题」）
+  function speak(text, queue) {
     if (!state.soundOn || typeof window.speechSynthesis === 'undefined') return;
     try {
-      window.speechSynthesis.cancel();
+      if (!queue) window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'zh-CN';
       u.rate = 0.9;
@@ -245,10 +246,22 @@
 
   /* ---------------- 活动清单（按顺序解锁） ---------------- */
   const ACTS = [
-    { id: 'add5', name: '小加法', emoji: '➕', tip: '合起来有几个', gen: genAdd5 },
-    { id: 'sub5', name: '小减法', emoji: '😋', tip: '喂饱小吃货', gen: genSub5 },
-    { id: 'make10', name: '凑十', emoji: '🔟', tip: '装满十格盘', gen: genMake10 },
-    { id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10 },
+    {
+      id: 'add5', name: '小加法', emoji: '➕', tip: '合起来有几个', gen: genAdd5,
+      speech: '小加法！把两堆好吃的合起来，一共有几个？',
+    },
+    {
+      id: 'sub5', name: '小减法', emoji: '😋', tip: '喂饱小吃货', gen: genSub5,
+      speech: '小减法！喂小吃货吃掉一些，还剩几个？',
+    },
+    {
+      id: 'make10', name: '凑十', emoji: '🔟', tip: '装满十格盘', gen: genMake10,
+      speech: '凑十！把十格盘装满，看看还差几个？',
+    },
+    {
+      id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10,
+      speech: '大冒险！十以内的加法和减法，加油！',
+    },
   ];
 
   /* ---------------- 进度存档 ---------------- */
@@ -332,8 +345,9 @@
   function startRound(idx) {
     state.runSeq += 1;
     state.act = { idx, qIndex: 0, retries: 0, firstTry: 0 };
+    speak(ACTS[idx].speech);        // 点卡片后先播报活动介绍（孩子不识字，靠听）
     showScreen('game');
-    renderQuestion();
+    renderQuestion(true);           // 首题读题不打断介绍，排在后面
   }
 
   function renderProgress() {
@@ -399,7 +413,7 @@
     });
   }
 
-  function renderQuestion() {
+  function renderQuestion(afterIntro) {
     const act = ACTS[state.act.idx];
     const q = act.gen();
     state.question = q;
@@ -475,7 +489,7 @@
 
     buildNumberChoices(q);
     renderProgress();
-    speak(q.speech);
+    speak(q.speech, !!afterIntro);
   }
 
   /* ---------------- 作答 ---------------- */

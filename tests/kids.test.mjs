@@ -77,6 +77,9 @@ for (const act of ACTS) {
   assert.ok(typeof act.name === 'string' && act.name.length >= 2 && act.name.length <= 6, act.id);
   assert.ok(typeof act.tip === 'string' && act.tip.length >= 3, act.id + ' tip');
   assert.equal(typeof act.gen, 'function', act.id + ' gen');
+  // 点卡片后的语音介绍（孩子不识字，靠听）
+  assert.ok(typeof act.speech === 'string' && act.speech.length >= 8, act.id + ' speech');
+  assert.ok(act.speech.replace(/[！？，]/g, '').startsWith(act.name.replace(/[！？，]/g, '')), act.id + ' speech 以活动名开头');
 }
 // 已移除的活动不应残留在代码里
 assert.doesNotMatch(kids, /genCount|genNumber|genMore|'count'|'number'|'more'/);
@@ -207,7 +210,7 @@ eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v10'/);
+assert.match(sw, /const CACHE = 'sxd-v11'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);
