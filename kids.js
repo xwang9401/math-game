@@ -447,7 +447,7 @@
   }
 
   function setNumberChoicesEnabled(enabled) {
-    $('#kChoices .bubble').forEach((button) => {
+    $$('#kChoices .bubble').forEach((button) => {
       button.disabled = !enabled;
       button.setAttribute('aria-disabled', String(!enabled));
     });

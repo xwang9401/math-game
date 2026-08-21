@@ -184,6 +184,7 @@ globalThis.api = { chooseNumber };
 }
 assert.match(kids, /q\.interactionComplete = !needsInteraction\(q\)/);
 assert.match(kids, /q\.interactionComplete = true;\s*setNumberChoicesEnabled\(true\)/);
+assert.match(kids, /\$\$\('#kChoices \.bubble'\)\.forEach/);
 
 // ---------- Share follow-up stays aligned with q.ask ----------
 {
