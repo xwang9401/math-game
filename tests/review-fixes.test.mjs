@@ -110,7 +110,7 @@ assert.doesNotMatch(game, /e\.key === 'Tab' \|\|/);
 assert.doesNotMatch(game, /soundOn: localStorage\.getItem/);
 assert.match(html, /id="feedback" role="status" aria-live="polite"/);
 assert.match(html, /id="soundBtn"[^>]+aria-pressed="true"/);
-assert.match(sw, /const CACHE = 'sxd-v11'/);
+assert.match(sw, /const CACHE = 'sxd-v12'/);
 assert.match(sw, /url\.origin !== self\.location\.origin \|\| !response\.ok/);
 assert.match(sw, /await cacheSuccessfulSameOrigin/);
 

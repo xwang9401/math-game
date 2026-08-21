@@ -126,6 +126,8 @@
   const playOops = () => { ensureAudio(); tone(330, 0, 0.2, 'sine', 0.12); };
   // 喂一口：「啊呜」两声短音
   const playNom = () => { ensureAudio(); tone(392, 0, 0.07, 'triangle', 0.2); tone(262, 0.07, 0.12, 'triangle', 0.2); };
+  // 搬进盘子：轻快上行两音
+  const playMove = () => { ensureAudio(); tone(440, 0, 0.06, 'sine', 0.15); tone(587, 0.06, 0.1, 'sine', 0.15); };
   const playStars = (n) => {
     ensureAudio();
     for (let i = 0; i < Math.max(1, n); i += 1) tone(523 + i * 131, i * 0.18, 0.25, 'sine', 0.22);
@@ -216,6 +218,23 @@
     };
   }
 
+  // 满十加：个位加法过十（5+7=12），凑十法的应用——
+  // 大数进十格盘做底，孩子把外面的小数逐个搬进空格，
+  // 盘子装满（10）+ 外面剩下的 = 答案
+  function genCarry() {
+    const sum = randInt(11, 18);
+    const base = randInt(Math.ceil(sum / 2), 9);   // 大数进盘做底
+    return {
+      type: 'carry',
+      prompt: '把外面的搬进盘子，一共有几个？',
+      speech: '把外面的搬进十格盘，装满十个，再加上剩下的，一共有几个',
+      emoji: pick(EMOJIS),
+      base, loose: sum - base,
+      answer: sum,
+      options: numOptions(sum, 0, 20),
+    };
+  }
+
   function genMix10() {
     if (Math.random() < 0.5) {
       const a = randInt(2, 9);
@@ -255,12 +274,16 @@
       speech: '小减法！喂小吃货吃掉一些，还剩几个？',
     },
     {
+      id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10,
+      speech: '大冒险！十以内的加法和减法，加油！',
+    },
+    {
       id: 'make10', name: '凑十', emoji: '🔟', tip: '装满十格盘', gen: genMake10,
       speech: '凑十！把十格盘装满，看看还差几个？',
     },
     {
-      id: 'mix10', name: '大冒险', emoji: '🌟', tip: '10 以内加减', gen: genMix10,
-      speech: '大冒险！十以内的加法和减法，加油！',
+      id: 'carry', name: '满十加', emoji: '🧺', tip: '装满十个再加', gen: genCarry,
+      speech: '满十加！把外面的搬进十格盘，装满十个，再加上剩下的，一共有几个？',
     },
   ];
 
@@ -485,6 +508,62 @@
     } else if (q.type === 'tenframe') {
       // 凑十：十格盘（装满盘 / 还差几个）
       stage.appendChild(buildTenFrame(q));
+    } else if (q.type === 'carry') {
+      // 满十加：大数已在盘里，把外面的搬进空格装满十个，再加剩下的
+      const wrap = document.createElement('div');
+      wrap.className = 'carry-wrap';
+      const frame = document.createElement('div');
+      frame.className = 'ten-frame';
+      frame.setAttribute('aria-label', '十格盘');
+      const cells = [];
+      for (let i = 0; i < 10; i += 1) {
+        const cell = document.createElement('span');
+        cell.className = 'ten-cell' + (i < q.base ? '' : ' empty');
+        cell.textContent = i < q.base ? q.emoji : '';
+        cell.style.animationDelay = (i * 0.04) + 's';
+        frame.appendChild(cell);
+        cells.push(cell);
+      }
+      const pile = document.createElement('div');
+      pile.className = 'obj-group carry-pile';
+      let moved = 0;
+      for (let i = 0; i < q.loose; i += 1) {
+        const obj = document.createElement('button');
+        obj.type = 'button';
+        obj.className = 'obj';
+        obj.setAttribute('aria-label', '点一点，搬进盘子里');
+        const pic = document.createElement('span');
+        pic.className = 'obj-pic';
+        pic.textContent = q.emoji;
+        obj.appendChild(pic);
+        obj.addEventListener('click', () => {
+          if (obj.classList.contains('moved')) return;
+          if (moved >= 10 - q.base) {
+            speak('盘子装满啦！加上外面剩下的，一共几个？');
+            return;
+          }
+          moved += 1;
+          obj.classList.add('moved');
+          obj.disabled = true;
+          const cell = cells[q.base + moved - 1];
+          cell.classList.remove('empty');
+          cell.textContent = q.emoji;
+          cell.classList.add('fill-in');
+          playMove();
+          speak(String(q.base + moved));
+          if (moved === 10 - q.base) {
+            const seq = state.runSeq;
+            setTimeout(() => {
+              if (state.screen === 'game' && state.runSeq === seq) {
+                speak('装满十个啦！外面还剩 ' + (q.loose - moved) + ' 个，一共几个？');
+              }
+            }, 900);
+          }
+        });
+        pile.appendChild(obj);
+      }
+      wrap.append(frame, pile);
+      stage.appendChild(wrap);
     }
 
     buildNumberChoices(q);

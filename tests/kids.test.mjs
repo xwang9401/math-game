@@ -44,7 +44,7 @@ function extractConstArray(source, name) {
 }
 
 // 在 vm 中运行 kids.js 里真实的出题器 / 活动清单 / 存档校验
-const GEN_NAMES = ['genAdd5', 'genSub5', 'genMake10', 'genMix10'];
+const GEN_NAMES = ['genAdd5', 'genSub5', 'genMake10', 'genMix10', 'genCarry'];
 const apiSource = `
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -70,9 +70,9 @@ const { ACTS, normalizeKidsStars, numOptions } = ctx.API;
 const eq = (actual, expected, msg) =>
   assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected), msg);
 
-// ---------- 活动清单结构（四个活动，按难度递增） ----------
-assert.equal(ACTS.length, 4);
-eq(ACTS.map((a) => a.id), ['add5', 'sub5', 'make10', 'mix10']);
+// ---------- 活动清单结构（五个活动，按难度递增） ----------
+assert.equal(ACTS.length, 5);
+eq(ACTS.map((a) => a.id), ['add5', 'sub5', 'mix10', 'make10', 'carry']);
 for (const act of ACTS) {
   assert.ok(typeof act.name === 'string' && act.name.length >= 2 && act.name.length <= 6, act.id);
   assert.ok(typeof act.tip === 'string' && act.tip.length >= 3, act.id + ' tip');
@@ -190,6 +190,20 @@ for (let i = 0; i < ROUNDS; i += 1) {
   assert.ok(sawAdd && sawFeed, '大冒险加减两种题型都应出现');
 }
 
+// ---------- 5. 满十加（个位加法过十：5+7=12，凑十法的应用） ----------
+for (let i = 0; i < ROUNDS; i += 1) {
+  const q = ctx.API.genCarry();
+  assertQuestionBase(q);
+  assert.equal(q.type, 'carry');
+  assert.ok(q.base >= 1 && q.base <= 9, 'carry base range');
+  assert.ok(q.loose >= 2 && q.loose <= 9, 'carry loose range');
+  assert.ok(q.base >= q.loose, 'carry 大数进盘做底');
+  assert.equal(q.answer, q.base + q.loose);
+  assert.ok(q.answer >= 11 && q.answer <= 18, 'carry 和过十且 ≤ 18');
+  assert.ok(q.loose - (10 - q.base) >= 1, '装满盘后外面一定还有剩（凑十结构）');
+  assert.ok(q.options.includes(q.answer));
+}
+
 // ---------- 存档校验（防篡改：必须从头连续玩过） ----------
 eq(normalizeKidsStars(null), {});
 eq(normalizeKidsStars('x'), {});
@@ -210,7 +224,7 @@ eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v11'/);
+assert.match(sw, /const CACHE = 'sxd-v12'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);
@@ -225,9 +239,11 @@ assert.match(kids, /function speak\(/);
 assert.match(kids, /speechSynthesis/);
 assert.doesNotMatch(kids, /setInterval/);          // 没有任何倒计时/计时器
 assert.match(kids, /'sxd_kids_stars'/);
-// 喂小吃货交互的必要结构
+// 喂小吃货 / 满十加交互的必要结构
 assert.match(kids, /MONSTER_SVG/);
 assert.match(kids, /appetite-slot/);          // 「想吃」气泡实物槽位
 assert.match(kids, /classList\.add\('eaten'\)/);
+assert.match(kids, /classList\.add\('moved'\)/);   // 满十加：搬走留下幽灵位
+assert.match(kids, /carry-pile/);
 
 console.log('kids.test.mjs: all checks passed');
