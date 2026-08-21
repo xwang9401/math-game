@@ -316,36 +316,61 @@ h2 {
   70% { transform: scale(0.85); }
 }
 
-/* 小吃货面板：怪物 + 食量圆点（喂一个亮一个，不识字也知道还要喂几个） */
+/* 小吃货面板：怪物 + 头顶「想吃」气泡（里面画着想吃的实物，喂一个亮一个） */
 .feed-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   flex: none;
 }
-.feed-monster { width: 62px; }
+.feed-monster { width: 68px; }
 .feed-monster svg { width: 100%; display: block; }
 .feed-monster.chomp svg { animation: monsterChomp 0.35s ease; }
 @keyframes monsterChomp {
   40% { transform: scale(1.22) rotate(-6deg); }
 }
 .appetite {
+  position: relative;
   display: flex;
-  gap: 6px;
-}
-.appetite-dot {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
+  gap: 5px;
   background: #fff;
-  border: 2.5px solid #e4cdd6;
-  transition: all 0.2s;
+  border-radius: 14px;
+  padding: 7px 10px;
+  box-shadow: 0 4px 12px rgba(214, 96, 157, 0.22);
+  animation: appetitePulse 1.5s ease-in-out infinite;   /* 没喂饱时轻轻脉动，吸引注意 */
 }
-.appetite-dot.filled {
-  background: #f5a623;
-  border-color: #f5a623;
-  transform: scale(1.15);
+.appetite.done { animation: none; }
+@keyframes appetitePulse {
+  50% { transform: scale(1.07); }
+}
+/* 气泡尾巴指向下面的小吃货 */
+.appetite::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+}
+.appetite-slot {
+  font-size: 31px;
+  line-height: 1.15;
+  filter: grayscale(1);
+  opacity: 0.32;
+  transition: filter 0.2s, opacity 0.2s;
+}
+.appetite-slot.filled {
+  filter: none;
+  opacity: 1;
+  animation: slotPop 0.35s ease;
+}
+@keyframes slotPop {
+  40% { transform: scale(1.4); }
 }
 
 .k-plus {
@@ -522,7 +547,8 @@ h2 {
   .obj { width: 54px; height: 54px; }
   .obj-pic { font-size: 34px; }
   .bubble { width: 82px; height: 82px; font-size: 38px; }
-  .feed-monster { width: 52px; }
+  .feed-monster { width: 56px; }
+  .appetite-slot { font-size: 26px; }
   .ten-frame { grid-template-columns: repeat(5, 48px); gap: 6px; padding: 10px; }
   .ten-cell { width: 48px; height: 48px; font-size: 28px; border-radius: 10px; }
   .act-card { padding: 14px 8px 12px; }

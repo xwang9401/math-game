@@ -207,7 +207,7 @@ eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v9'/);
+assert.match(sw, /const CACHE = 'sxd-v10'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);
@@ -224,7 +224,7 @@ assert.doesNotMatch(kids, /setInterval/);          // 没有任何倒计时/计�
 assert.match(kids, /'sxd_kids_stars'/);
 // 喂小吃货交互的必要结构
 assert.match(kids, /MONSTER_SVG/);
-assert.match(kids, /appetite/);
+assert.match(kids, /appetite-slot/);          // 「想吃」气泡实物槽位
 assert.match(kids, /classList\.add\('eaten'\)/);
 
 console.log('kids.test.mjs: all checks passed');

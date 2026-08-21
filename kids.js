@@ -433,11 +433,12 @@
       monster.innerHTML = MONSTER_SVG;
       const appetite = document.createElement('div');
       appetite.className = 'appetite';
-      appetite.setAttribute('aria-label', '还要喂几个');
+      appetite.setAttribute('aria-label', '小吃货还想吃几个');
       for (let i = 0; i < q.toEat; i += 1) {
-        const dot = document.createElement('span');
-        dot.className = 'appetite-dot';
-        appetite.appendChild(dot);
+        const slot = document.createElement('span');
+        slot.className = 'appetite-slot';
+        slot.textContent = q.emoji;        // 气泡里画着它想吃的同款实物
+        appetite.appendChild(slot);
       }
       panel.append(monster, appetite);
 
@@ -458,6 +459,7 @@
         playNom();
         speak(String(fed));
         if (fed === q.toEat) {
+          appetite.classList.add('done');   // 喂饱后停止脉动提醒
           const seq = state.runSeq;
           setTimeout(() => {
             if (state.screen === 'game' && state.runSeq === seq) speak('还剩几个？');
