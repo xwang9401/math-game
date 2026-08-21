@@ -147,6 +147,7 @@ math-game/
 node tests/review-fixes.test.mjs
 node tests/scrolls.test.mjs
 node tests/kids.test.mjs
+node tests/review-regressions.test.mjs
 ```
 
 检查覆盖 JavaScript 语法、四类出题器的数值约束、闯关题量边界、异步取消保护、挑战截止时间保护、无障碍标记以及 Service Worker 缓存规则；`scrolls.test.mjs` 另外验证 8 个秘籍出题器生成的题目必然符合对应技巧特征（3000 轮不变量）与秘籍存档的连续性校验；`kids.test.mjs` 验证幼儿版六个活动出题器的数值范围（含「剩 0」边界）、选项生成的唯一性与幼儿存档校验，并守卫两版代码互不混杂。

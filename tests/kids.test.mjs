@@ -257,7 +257,7 @@ eq(normalizeKidsStars({ add5: '3', sub5: '1' }), { add5: 3, sub5: 1 });
 // 主应用未被改动混入幼儿逻辑（两个应用保持独立）
 assert.doesNotMatch(game, /ACTS|normalizeKidsStars/);
 // SW 收录幼儿版资源并升级版本
-assert.match(sw, /const CACHE = 'sxd-v13'/);
+assert.match(sw, /const CACHE = 'sxd-v14'/);
 assert.match(sw, /'\.\/kids\.html'/);
 assert.match(sw, /'\.\/kids\.js'/);
 assert.match(sw, /'\.\/manifest-kids\.json'/);
